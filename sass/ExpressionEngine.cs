@@ -173,15 +173,20 @@ namespace sass
             else
             {
                 // Interpret value
-                if (expression == "$")
-                    return PC;
-                else if (expression.StartsWith("0x")) // Hex
-                    return Convert.ToUInt64(expression.Substring(2), 16);
-                else if (expression.StartsWith("$") || (expression.EndsWith("h") &&
-                    expression.Remove(expression.Length - 1).ToLower().Count(c => !"0123456789abcdef".Contains(c)) == 0))
-                    return Convert.ToUInt64(expression.Trim('$', 'h'), 16);
-                else if (expression.StartsWith("0b")) // Binary
-                    return Convert.ToUInt64(expression.Substring(2), 2);
+				if (expression == "$")
+					return PC;
+				else if (expression.StartsWith ("0x")) // Hex
+                    return Convert.ToUInt64 (expression.Substring (2), 16);
+				else if (expression.StartsWith ("$") || (expression.EndsWith ("h") &&
+				                     expression.Remove (expression.Length - 1).ToLower ().Count (c => !"0123456789abcdef".Contains (c)) == 0))
+					return Convert.ToUInt64 (expression.Trim ('$', 'h'), 16);
+				else if (expression.StartsWith ("0b")) // Binary
+                    return Convert.ToUInt64 (expression.Substring (2), 2);
+				// Binary Cesc
+				else if (expression.EndsWith ("b") && this.IsBinaryString(expression.Substring(0,expression.Length-1))) { 
+					// Console.WriteLine ("Cesc Binary value:" + expression + "Valor: " + expression.Substring(0,expression.Length-1));
+					return Convert.ToUInt64 (expression.Substring(0,expression.Length-1), 2);
+				}
                 else if (expression.StartsWith("$") || (expression.EndsWith("h") &&
                     expression.Remove(expression.Length - 1).ToLower().Count(c => !"01".Contains(c)) == 0))
                     return Convert.ToUInt64(expression.Trim('%', 'b'), 2);
@@ -205,7 +210,15 @@ namespace sass
                     for (int i = 0; i < expression.Length; i++)
                         if (!char.IsNumber(expression[i]))
                             number = false;
-                    if (number) // Decimal
+					if (number) // Decimal
+					if (expression == "") {
+						// Cesc valor per defecte 0
+						//Console.WriteLine("Expression is void at root line number: " +rootLineNumber);
+						//throw new KeyNotFoundException("Expression is void at root line number: " +rootLineNumber);
+						expression ="0";
+						return Convert.ToUInt64(expression);
+					}
+					else
                         return Convert.ToUInt64(expression);
                     else
                     {
@@ -302,5 +315,16 @@ namespace sass
             }
             return result;
         }
+
+		bool IsBinaryString(string str)
+		{
+			foreach (char c in str)
+			{
+				if (c < '0' || c > '1')
+					return false;
+			}
+
+			return true;
+		}
     }
 }
