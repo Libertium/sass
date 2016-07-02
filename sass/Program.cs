@@ -16,7 +16,8 @@ namespace sass
         public static int Main(string[] args)
         {
             InstructionSets = new Dictionary<string, InstructionSet>();
-            InstructionSets.Add("z80", LoadInternalSet("sass.Tables.z80.table"));
+			InstructionSets.Add("z80", LoadInternalSet("sass.Tables.z80.table"));
+            InstructionSets.Add("z80alt", LoadInternalSet("sass.Tables.z80alt.table"));
             string instructionSet = "z80"; // Default
             string inputFile = null, outputFile = null;
             var settings = new AssemblySettings();
@@ -69,6 +70,10 @@ namespace sass
                             case "--instruction-set":
                                 instructionSet = args[++i];
                                 break;
+							case "-asmsx":
+							case "--asmsx":
+								instructionSet = "z80alt";
+								break;
                             case "-l":
                             case "--listing":
                                 settings.ListingOutput = args[++i];
@@ -150,6 +155,7 @@ namespace sass
             watch.Start();
             var output = assembler.Assemble(file, inputFile);
             watch.Stop();
+			settings.Verbose = assembler.EnableVerbose;
 
             if (outputFile == "-")
                 Console.OpenStandardOutput().Write(output.Data, 0, output.Data.Length);
@@ -267,6 +273,20 @@ namespace sass
         private static void DisplayHelp()
         {
             // TODO
+			Console.WriteLine("-h -? /? /help -help --help: \tDisplayHelp();");
+			Console.WriteLine("-d --define: \t\t\tdefines.AddRange(args[++i].Split(','));");
+			Console.WriteLine("--debug-mode: \t\t\ttThread.Sleep(10000);");
+			Console.WriteLine("--encoding: \t\t\tsettings.Encoding = Encoding.GetEncoding(args[++i]);");
+			Console.WriteLine("--inc --include: \t\ttsettings.IncludePath = args[++i].Split(';');");
+			Console.WriteLine("--input --input-file: \t\ttinputFile = args[++i];");
+			Console.WriteLine("--instr --instruction-set: \ttinstructionSet = args[++i];");
+			Console.WriteLine("-l --listing: \t\t\tsettings.ListingOutput = args[++i];");
+			Console.WriteLine("--list-encodings: \t\ttEncoding.GetEncodings()");
+			Console.WriteLine("--nest-macros: \t\t\tsettings.AllowNestedMacros = true;");
+			Console.WriteLine("--output: --output-file: \toutputFile = args[++i];");
+			Console.WriteLine("-s --symbols: \t\t\tsettings.SymbolOutput = args[++i];");
+			Console.WriteLine("-v --verbose: \t\t\tsettings.Verbose = true;");
+			Console.WriteLine("-asmsx --asmsx: \t\tasMSX syntax");
         }
     }
 }
