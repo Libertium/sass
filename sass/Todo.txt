@@ -1,4 +1,4 @@
-
+﻿
 TODO:
 =====
 
@@ -15,5 +15,6 @@ TODO:
 () Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
 () Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
 () Validar el calcul de expressions per exemple .equ value 0x1234 - 28
+() Fer la volta al món
 
 
