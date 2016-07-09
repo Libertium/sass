@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace sass
 {
@@ -31,6 +32,19 @@ namespace sass
         private string CurrentLine { get; set; }
         private bool Listing { get; set; }
 
+		public bool EnableVerbose { get; set; }
+
+		/// <summary>
+		/// Cesc: Only for testing purposes <see cref="sass.Assembler"/> cesc verbose.
+		/// </summary>
+		/// <value><c>true</c> if cesc verbose; otherwise, <c>false</c>.</value>
+		public bool CescVerbose { get; set; }
+		/// <summary>
+		/// Cesc: Gets or sets a value indicating whether this <see cref="sass.Assembler"/> is ASMS.
+		/// </summary>
+		/// <value><c>true</c> if ASMS; otherwise, <c>false</c>.</value>
+		public bool ASMSX { get; set; }
+
         public Assembler(InstructionSet instructionSet, AssemblySettings settings)
         {
             InstructionSet = instructionSet;
@@ -52,7 +66,31 @@ namespace sass
         {
             Output = new AssemblyOutput();
             Output.InstructionSet = InstructionSet;
-            assembly = assembly.Replace("\r", "");
+
+			// Cesc
+			//assembly = assembly.Replace("\r", "");
+			assembly = assembly.Replace("\r", "").Replace('\t',' ');
+			if (ASMSX)
+				assembly = assembly.Replace ("@@", ".");
+
+			// Cesc Eliminar els comentaris del tipus /* */ o //
+			if (ASMSX) {
+				var blockComments = @"/\*(.*?)\*/";
+				var lineComments = @"//(.*?)\r?\n";
+				var strings = @"""((\\[^\n]|[^""\n])*)""";
+				var verbatimStrings = @"@(""[^""]*"")+";
+
+				assembly = Regex.Replace (assembly,
+					blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
+					me => {
+						if (me.Value.StartsWith ("/*") || me.Value.StartsWith ("//"))
+							return me.Value.StartsWith ("//") ? Environment.NewLine : "";
+						// Keep the literal strings
+						return me.Value;
+					},
+					RegexOptions.Singleline);
+			}
+
             PC = 0;
             Lines = assembly.Split('\n');
             FileNames.Push(Path.GetFileName(fileName));
@@ -61,7 +99,7 @@ namespace sass
             IfStack.Push(true);
             for (CurrentIndex = 0; CurrentIndex < Lines.Length; CurrentIndex++)
             {
-                CurrentLine = Lines[CurrentIndex].Trim().TrimComments();
+                CurrentLine = Lines[CurrentIndex].Trim().TrimComments();					
                 if (SuspendedLines == 0)
                 {
                     LineNumbers.Push(LineNumbers.Pop() + 1);
@@ -91,7 +129,20 @@ namespace sass
                     var definition = CurrentLine.Substring(CurrentLine.SafeIndexOf(".equ") + 4);
                     CurrentLine = ".equ " + name.Trim() + " " + definition.Trim();
                 }
+					
 
+				// Cesc: fer que accepti els db de la mateixa forma que .db
+				if (ASMSX && CurrentLine.Trim ().StartsWith ("db ")) {
+					CurrentLine = "." + CurrentLine;
+					//Console.WriteLine (CurrentLine);
+				}
+
+				// Cesc: fer que accepti els dw de la mateixa forma que .dw
+				if (ASMSX && CurrentLine.Trim ().StartsWith ("dw ")) {
+					CurrentLine = "." + CurrentLine;
+					//Console.WriteLine (CurrentLine);
+				}
+					
                 // Check for macro
                 if (!CurrentLine.StartsWith(".macro") && !CurrentLine.StartsWith("#macro") && !CurrentLine.StartsWith(".undefine") && !CurrentLine.StartsWith("#undefine"))
                 {
@@ -214,6 +265,7 @@ namespace sass
                     }
                 }
 
+				/// Cesc: quina mena de declaracio d'etiqueta es :LABEL ??
                 if (CurrentLine.StartsWith(":") || CurrentLine.EndsWith(":")) // Label
                 {
                     string label;
@@ -273,11 +325,15 @@ namespace sass
                     CurrentIndex--;
                     continue;
                 }
-
+					
                 if (CurrentLine.StartsWith(".") || CurrentLine.StartsWith("#")) // Directive
-                {
+                {					
                     // Some directives need to be handled higher up
-                    var directive = CurrentLine.Substring(1).Trim();
+					var directive = CurrentLine.Substring(1).Trim();
+					//Cesc
+					//if(directive.IndexOf("org") != -1 || directive.IndexOf("block") != -1)
+					//	Console.WriteLine(directive);
+
                     string[] parameters = new string[0];
                     if (directive.SafeIndexOf(' ') != -1)
                         parameters = directive.Substring(directive.SafeIndexOf(' ')).Trim().SafeSplit(' ');
@@ -344,29 +400,34 @@ namespace sass
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(CurrentLine) || !Listing)
-                        continue;
-                    // Check instructions
-                    var match = InstructionSet.Match(CurrentLine);
-                    if (match == null)
-                        AddError(CodeType.Instruction, AssemblyError.InvalidInstruction); // Unknown instruction
-                    else
-                    {
-                        // Instruction to be fully assembled in the next pass
-                        Output.Listing.Add(new Listing
-                        {
-                            Code = CurrentLine,
-                            CodeType = CodeType.Instruction,
-                            Error = AssemblyError.None,
-                            Warning = AssemblyWarning.None,
-                            Instruction = match,
-                            Address = PC,
-                            FileName = FileNames.Peek(),
-                            LineNumber = LineNumbers.Peek(),
-                            RootLineNumber = RootLineNumber
-                        });
-                        PC += match.Length;
-                    }
+					if (string.IsNullOrEmpty (CurrentLine) || !Listing) {
+						continue;
+					} else {
+
+						/// Cesc verbose
+						if(CescVerbose)
+							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
+
+						// Check instructions
+						var match = InstructionSet.Match (CurrentLine);
+						if (match == null)
+							AddError (CodeType.Instruction, AssemblyError.InvalidInstruction); // Unknown instruction
+                    else {
+							// Instruction to be fully assembled in the next pass
+							Output.Listing.Add (new Listing {
+								Code = CurrentLine,
+								CodeType = CodeType.Instruction,
+								Error = AssemblyError.None,
+								Warning = AssemblyWarning.None,
+								Instruction = match,
+								Address = PC,
+								FileName = FileNames.Peek (),
+								LineNumber = LineNumbers.Peek (),
+								RootLineNumber = RootLineNumber
+							});
+							PC += match.Length;
+						}
+					}
                 }
             }
             return Finish(Output);
@@ -409,13 +470,20 @@ namespace sass
             for (int i = 0; i < output.Listing.Count; i++)
             {
                 var entry = output.Listing[i];
+				/// Cesc
+				// Console.WriteLine(entry.FileName + " " + entry.LineNumber + " " + entry.Instruction);
                 RootLineNumber = entry.RootLineNumber;
                 PC = entry.Address;
                 LineNumbers = new Stack<int>(new[] { entry.LineNumber });
                 if (entry.CodeType == CodeType.Directive)
                 {
-                    if (entry.PostponeEvalulation)
-                        output.Listing[i] = HandleDirective(entry.Code, true);
+					// PassTwo
+					if (entry.PostponeEvalulation) {
+						/// Cesc
+						//Console.WriteLine ("Pass Two: " + entry.Code);
+						output.Listing [i] = HandleDirective (entry.Code, true);
+					}
+
                     if (output.Listing[i].Output != null)
                         finalBinary.AddRange(output.Listing[i].Output);
                     continue;
@@ -526,6 +594,9 @@ namespace sass
 
         private Listing HandleDirective(string line, bool passTwo = false)
         {
+			// Cesc debug directives
+			//Console.WriteLine (line);
+
             string directive = line.Substring(1).Trim();
             string[] parameters = new string[0];
             string parameter = "";
@@ -547,6 +618,10 @@ namespace sass
                 LineNumber = LineNumbers.Peek(),
                 RootLineNumber = RootLineNumber
             };
+
+			// Cesc
+			// if (passTwo) Console.WriteLine ("Pass Two");
+
             try
             {
                 switch (directive)
@@ -616,6 +691,9 @@ namespace sass
                             }
                             else
                             {
+								// Cesc: resoldre el bug .dw 0,0,0 
+								parameters = parameter.SafeSplit(',');
+
                                 listing.Output = new byte[parameters.Length * (InstructionSet.WordSize / 8)];
                                 listing.PostponeEvalulation = true;
                                 PC += (uint)listing.Output.Length;
@@ -658,7 +736,7 @@ namespace sass
                                 return listing;
                             }
                         }
-                        break;
+                        //break;
                     case "end":
                         return listing;
                     case "fill":
@@ -677,7 +755,13 @@ namespace sass
                         }
                     case "org":
                         PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						// Cesc TODO el org no es comporta com esperem !!!
+						//	[] Si hi ha un tab entre el .org i la adreça 04600h el org es ignorat
+						// Console.WriteLine("<<PC: {0:X}>>", PC);
                         return listing;
+					case "verbose":
+						EnableVerbose = true;
+						break;
                     case "include":
                         {
                             string file = GetIncludeFile(parameter);
@@ -689,7 +773,28 @@ namespace sass
                             FileNames.Push(Path.GetFileName(parameter.Substring(1, parameter.Length - 2)));
                             LineNumbers.Push(0);
                             string includedFile = File.ReadAllText(file) + "\n.endfile";
+
+							// Cesc Eliminar els comentaris del tipus /* */ o //
+							Console.WriteLine("Include: "+file);
+							if (ASMSX){
+								var blockComments = @"/\*(.*?)\*/";
+								var lineComments = @"//(.*?)\r?\n";
+								var strings = @"""((\\[^\n]|[^""\n])*)""";
+								var verbatimStrings = @"@(""[^""]*"")+";
+
+								includedFile = Regex.Replace(includedFile,
+								blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
+								me => {
+									if (me.Value.StartsWith("/*") || me.Value.StartsWith("//"))
+										return me.Value.StartsWith("//") ? Environment.NewLine : "";
+									// Keep the literal strings
+									return me.Value;
+								},
+								RegexOptions.Singleline);
+							}
+
                             string[] lines = includedFile.Replace("\r", "").Split('\n');
+
                             Lines =
                                 Lines.Take(CurrentIndex + 1)
                                      .Concat(lines)
@@ -1009,6 +1114,7 @@ namespace sass
         private string GetIncludeFile(string file)
         {
             file = file.Substring(1, file.Length - 2); // Remove <> or ""
+			file = file.Replace("\\","/");
             if (File.Exists(file))
                 return file;
             foreach (var path in Settings.IncludePath)

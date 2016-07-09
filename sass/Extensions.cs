@@ -37,12 +37,25 @@ namespace sass
         /// </summary>
         public static string TrimComments(this string value)
         {
+			int commentPosition = value.IndexOf (';');
+			/// Cesc: el cas mes simple, no hi han comentaris
+			if (commentPosition == -1)
+				return value.Trim(); //.Substring (0, commentPosition - 1).Trim ();
+			// else
+			//	Console.WriteLine (value);
+
             value = value.Trim();
+			if (value [0] == ';')
+				return "";
             bool inString = false, inChar = false;
             for (int i = 0; i < value.Length; i++)
             {
+				
                 if (value[i] == ';' && !inString && !inChar)
-                    return value.Remove(i).Trim();
+					// Cesc bug horroros, torna un string amb valors 0xFE 0xFF !!
+					//return value.Remove(i).Trim();
+					return value.Substring(0,i).Trim();
+				
                 if (value[i] == '"' && !inChar)
                     inString = !inString;
                 if (value[i] == '\'' && !inString)

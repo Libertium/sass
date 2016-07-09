@@ -11,6 +11,9 @@ namespace sass
 {
     public class Program
     {
+		static bool cescVerbose = false;
+		static bool asmsx = false;
+
         public static Dictionary<string, InstructionSet> InstructionSets;
 
         public static int Main(string[] args)
@@ -70,10 +73,16 @@ namespace sass
                             case "--instruction-set":
                                 instructionSet = args[++i];
                                 break;
-							case "-asmsx":
+							case "-as":
 							case "--asmsx":
 								instructionSet = "z80alt";
+								asmsx = true;
 								break;
+						
+							case "--cv":
+								cescVerbose = true;
+							break;
+
                             case "-l":
                             case "--listing":
                                 settings.ListingOutput = args[++i];
@@ -144,57 +153,68 @@ namespace sass
                 selectedInstructionSet = InstructionSets[instructionSet];
 
             var assembler = new Assembler(selectedInstructionSet, settings);
+
+			assembler.CescVerbose = cescVerbose;
+			assembler.ASMSX = asmsx;
+
             foreach (var define in defines)
                 assembler.ExpressionEngine.Symbols.Add(define.ToLower(), new Symbol(1));
-            string file;
-            if (inputFile == "-")
-                file = Console.In.ReadToEnd();
-            else
-                file = File.ReadAllText(inputFile);
+            string file ="";
+			if (inputFile == "-")
+				file = Console.In.ReadToEnd ();
+			else if (File.Exists (inputFile)) {
+				file = File.ReadAllText (inputFile);
+			} else {
+				Console.Error.WriteLine("File not found: {0}",inputFile);
+				Console.Error.WriteLine ("Press any key to continue...");
+				Console.ReadKey (true);
+			}
             var watch = new Stopwatch();
-            watch.Start();
-            var output = assembler.Assemble(file, inputFile);
-            watch.Stop();
-			settings.Verbose = assembler.EnableVerbose;
+            
+			AssemblyOutput output = null;
+			if (file != "") {
+				watch.Start ();
+				output = assembler.Assemble (file, inputFile);
+				watch.Stop ();
+			
+				settings.Verbose = assembler.EnableVerbose;
 
-            if (outputFile == "-")
-                Console.OpenStandardOutput().Write(output.Data, 0, output.Data.Length);
-            else
-                File.WriteAllBytes(outputFile, output.Data);
-            var errors = from l in output.Listing
-                         where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
-                         orderby l.RootLineNumber
-                         select l;
-            if (!settings.Verbose)
-            {
-                foreach (var listing in errors)
-                {
-                    if (listing.Error != AssemblyError.None)
-                        Console.Error.WriteLine(listing.FileName + ":" + listing.LineNumber + " Error: " + listing.Error);
-                    if (listing.Warning != AssemblyWarning.None)
-                        Console.Error.WriteLine(listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning);
-                }
-            }
+				if (outputFile == "-")
+					Console.OpenStandardOutput ().Write (output.Data, 0, output.Data.Length);
+				else
+					File.WriteAllBytes (outputFile, output.Data);
+				var errors = from l in output.Listing
+				             where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
+				             orderby l.RootLineNumber
+				             select l;
+				if (!settings.Verbose) {
+					foreach (var listing in errors) {
+						if (listing.Error != AssemblyError.None)
+							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Error: " + listing.Error);
+						if (listing.Warning != AssemblyWarning.None)
+							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning);
+					}
+				}
+			
+				if (settings.Verbose || settings.ListingOutput != null) {
+					var listing = GenerateListing (output);
+					if (settings.Verbose)
+						Console.Write (listing);
+					if (settings.ListingOutput != null)
+						File.WriteAllText (settings.ListingOutput, listing);
+				}
 
-            if (settings.Verbose || settings.ListingOutput != null)
-            {
-                var listing = GenerateListing(output);
-                if (settings.Verbose)
-                    Console.Write(listing);
-                if (settings.ListingOutput != null)
-                    File.WriteAllText(settings.ListingOutput, listing);
-            }
+				if (settings.SymbolOutput != null)
+					WriteSymbols (settings.SymbolOutput, assembler);
 
-            if (settings.SymbolOutput != null)
-                WriteSymbols(settings.SymbolOutput, assembler);
-
-            Console.Error.WriteLine("Assembly done: {0} ms", watch.ElapsedMilliseconds);
-            if (Debugger.IsAttached)
-            {
-                Console.Error.WriteLine("Press any key to continue...");
-                Console.ReadKey(true);
-            }
-			return errors.Count(e => e.Error != AssemblyError.None);
+				Console.Error.WriteLine ("Assembly done: {0} ms", watch.ElapsedMilliseconds);
+				if (Debugger.IsAttached) {
+					Console.Error.WriteLine ("Press any key to continue...");
+					Console.ReadKey (true);
+				}
+				return errors.Count (e => e.Error != AssemblyError.None);
+			}
+			return -1;
         }
 
         private static void WriteSymbols(string path, Assembler assembler)
@@ -286,7 +306,7 @@ namespace sass
 			Console.WriteLine("--output: --output-file: \toutputFile = args[++i];");
 			Console.WriteLine("-s --symbols: \t\t\tsettings.SymbolOutput = args[++i];");
 			Console.WriteLine("-v --verbose: \t\t\tsettings.Verbose = true;");
-			Console.WriteLine("-asmsx --asmsx: \t\tasMSX syntax");
+			Console.WriteLine("-as --asmsx: \t\tasMSX syntax");
         }
     }
 }

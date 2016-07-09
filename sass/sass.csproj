@@ -21,8 +21,9 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Commandlineparameters>--listing test.list test.asm</Commandlineparameters>
+    <Commandlineparameters>--listing test.list --asmsx  tests/test.asm</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
+    <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,6 +32,8 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Externalconsole>true</Externalconsole>
+    <Commandlineparameters>--listing test.list --asmsx test3.asm</Commandlineparameters>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -66,13 +69,25 @@
   <ItemGroup>
     <None Include="App.config" />
     <EmbeddedResource Include="Tables\z80.table" />
+    <EmbeddedResource Include="Tables\z80alt.table" />
+    <None Include="Todo.txt" />
+    <None Include="tests\as.asm" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="test.asm">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <Content Include="tests\test.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="test2.asm">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <Content Include="tests\test2.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\trilo\demosong_asMSX.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\test3.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\test4.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
