@@ -802,6 +802,99 @@ namespace sass
                                      .ToArray();
                             return listing;
                         }
+					/// Cesc
+					case "incbin":
+					{
+						if(CescVerbose)
+						{
+							//Console.WriteLine("incbin paramenters {0} parameter {1}",parameters, parameter);
+							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
+						}
+						parameters = parameters.Where(w => w != "").ToArray(); 
+
+						string file ="";
+						long amountSkip =0;
+						long amountSize =0;
+
+						if (parameters.Length > 0)
+						{
+							file = parameters[0].Trim().Substring(1, parameters[0].Length - 2); // Remove <> or ""
+							file = file.Replace("\\","/");
+
+							if (parameters.Length > 1)
+							{
+								string skipValue ="";
+								string sizeValue ="";
+								bool skip = false;
+								bool size = false;
+								foreach(string param in parameters.Skip(1))
+								{
+									if (param.ToUpper() == "SKIP")
+									{
+										skip =true;
+										size = false;
+									}
+									else if (param.ToUpper() == "SIZE")
+									{
+										size = true;
+										skip = false;
+									}
+									else
+									{
+										if(skip)
+											skipValue += param;
+										if(size)
+											sizeValue += param;
+									}
+								}
+								amountSkip = (long)ExpressionEngine.Evaluate(skipValue, PC, RootLineNumber);
+								amountSize = (long)ExpressionEngine.Evaluate(sizeValue, PC, RootLineNumber);
+								// Console.WriteLine("skip {0} size {1}",skipValue, sizeValue);
+								// Console.WriteLine("skip {0} size {1}",amountSkip, amountSize);
+							}
+							if(file != "")
+							{
+								if (File.Exists(file))
+								{
+									var fs = new FileStream(file, FileMode.Open);
+									try{
+										if (amountSkip + amountSize > fs.Length)
+											throw new Exception("Lectura fora del fitxer.");
+
+										if (amountSize == 0) 
+											amountSize = fs.Length;
+										if(amountSkip >0)
+											fs.Seek(amountSkip, SeekOrigin.Begin);
+							
+										byte[] fileBytes = new byte[amountSize];
+										fs.Read(fileBytes, 0, (int)amountSize);
+										fs.Close();
+
+										if(CescVerbose)
+											Console.WriteLine("Readed {0} bytes",fileBytes.Length);
+										
+										listing.Output = fileBytes; 
+										return listing;
+									}catch(Exception ex)
+									{
+										if(CescVerbose)
+											Console.WriteLine("Error {0}", ex.Message);	
+										
+										/// TODO: cal un error adequat
+										listing.Error = AssemblyError.FileNotFound;
+										fs.Close();
+									}
+								}
+								else{
+									
+									//Console.WriteLine("File {0} not found.",file);
+									listing.Error = AssemblyError.FileNotFound;
+								}
+							}
+						}
+						break;
+					}
+					
                     case "endfile": // Special, undocumented directive
                         RootLineNumber--;
                         LineNumbers.Pop();
