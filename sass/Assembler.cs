@@ -809,6 +809,28 @@ namespace sass
 						Console.WriteLine("<<PC: {0:X}, parameter {1} RootLineNumber{2}>>", PC, parameter, RootLineNumber);
 						ORGsList.Add(new ORGItem(parameter, PC));
                         return listing;
+
+                    case "page":
+
+                        ulong page = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+                        switch (page)
+                        {
+                            case 0:
+                                PC = 0;
+                                break;
+                            case 1:
+                                PC = 0x4000;
+                                break;
+                            case 2:
+                                PC = 0x8000;
+                                break;
+                            case 3:
+                                PC = 0xc000;
+                                break;
+                        }
+
+                        return listing;
+
 					case "verbose":
 						EnableVerbose = true;
 						break;
