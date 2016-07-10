@@ -21,7 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Commandlineparameters>--listing test.list --asmsx tests/incbin/test.asm</Commandlineparameters>
+    <Commandlineparameters>--listing test.list --asmsx tests/org/test.asm --cv</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
@@ -121,9 +121,6 @@
     <Content Include="tests\test6.asm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="tests\as.asm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="tests\trilo\demosong2.asm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -134,6 +131,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="tests\incbin\test.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\org\test.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\megarom\as.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="tests\rom\test.asm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -147,5 +153,8 @@
   -->
   <ItemGroup>
     <Folder Include="tests\incbin\" />
+    <Folder Include="tests\org\" />
+    <Folder Include="tests\rom\" />
+    <Folder Include="tests\megarom\" />
   </ItemGroup>
 </Project>

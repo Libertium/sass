@@ -46,6 +46,20 @@ namespace sass
 		public bool ASMSX { get; set; }
 		public bool IsROM = false;
 		public bool IsMegaROM = false;
+		public List<ORGItem> ORGsList { get; set; }
+
+		public struct ORGItem
+		{
+			public ORGItem(uint adress, uint length)
+			{
+				ORGAdress = adress;
+				ORGLength = length;
+			}
+
+			public uint ORGAdress { get; private set; }
+			public uint ORGLength { get; private set; }
+		}
+
 
         public Assembler(InstructionSet instructionSet, AssemblySettings settings)
         {
@@ -60,6 +74,8 @@ namespace sass
             IfStack = new Stack<bool>();
             WorkingIfStack = new Stack<bool>();
             Listing = true;
+
+			ORGsList = new List<ORGItem> ();
         }
 
         readonly string[] ifDirectives = new[] { "endif", "else", "elif", "elseif", "ifdef", "ifndef", "if" };
@@ -788,9 +804,10 @@ namespace sass
                         }
                     case "org":
                         PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						
 						// Cesc TODO el org no es comporta com esperem !!!
-						//	[] Si hi ha un tab entre el .org i la adreça 04600h el org es ignorat
-						// Console.WriteLine("<<PC: {0:X}>>", PC);
+						Console.WriteLine("<<PC: {0:X}, parameter {1} RootLineNumber{2}>>", PC, parameter, RootLineNumber);
+						ORGsList.Add(new ORGItem(PC, 0));
                         return listing;
 					case "verbose":
 						EnableVerbose = true;
@@ -907,6 +924,7 @@ namespace sass
 											Console.WriteLine("Readed {0} bytes",fileBytes.Length);
 										
 										listing.Output = fileBytes; 
+										PC += (uint)fileBytes.Length;
 										return listing;
 									}catch(Exception ex)
 									{
