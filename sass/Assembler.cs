@@ -44,6 +44,8 @@ namespace sass
 		/// </summary>
 		/// <value><c>true</c> if ASMS; otherwise, <c>false</c>.</value>
 		public bool ASMSX { get; set; }
+		public bool IsROM = false;
+		public bool IsMegaROM = false;
 
         public Assembler(InstructionSet instructionSet, AssemblySettings settings)
         {
@@ -626,6 +628,34 @@ namespace sass
             {
                 switch (directive)
                 {
+					case "rom":
+						if (parameters.Length != 0)
+						{
+							listing.Error = AssemblyError.InvalidDirective;
+							return listing;
+						}
+						else
+						{
+							IsROM = true;
+							return listing;
+						}
+
+					case "megarom":
+					if (parameters.Length == 0)
+						{
+							listing.Error = AssemblyError.InvalidDirective;
+							return listing;
+						}
+						else
+						{
+							// Konami:subpagina de 8 KB,límite de 32 pag.Entre 4000h-5FFFh esta necesariamente la subpágina 0,no puede cambiarse.
+							// KonamiSCC: subpágina de 8 KB, límite de 64 páginas. Limite de 512 KB (4 megabits). Soporta acceso a SCC.
+							// ASCII8: tamaño de subpágina de 8 KB, límite de 256 pag. Maximo megaROM de 2048 KB (16 megabits, 2 megabytes).
+							// ASCII16: subpágina de 16 KB, límite de 256 paginas. El tamaño máximo del megaROM sera 4096 KB (32 megabits).
+							IsMegaROM = true;
+							return listing;
+						}
+
                     case "block":
                         {
                             ulong amount = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
@@ -739,7 +769,10 @@ namespace sass
                         //break;
                     case "end":
                         return listing;
-                    case "fill":
+                    
+					/// Cesc
+					case "ds":
+					case "fill":
                         {
                             parameters = parameter.SafeSplit(',');
                             ulong amount = ExpressionEngine.Evaluate(parameters[0], PC, RootLineNumber);
@@ -1128,7 +1161,7 @@ namespace sass
 							PC += (uint)listing.Output.Length;
 							return listing;
 						}
-						break;
+						//break; //Cesc unreachable code
                     case "asciip":
 						if (passTwo)
 						{
@@ -1163,7 +1196,7 @@ namespace sass
 							PC += (uint)listing.Output.Length;
 							return listing;
 						}
-						break;
+						//break; //Cesc unrecheable code
                     case "nolist":
                         Listing = false;
                         return listing;

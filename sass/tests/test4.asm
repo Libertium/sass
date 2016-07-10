@@ -1,30 +1,39 @@
-﻿
+﻿	.start init
+	;db "MegaROM",1ah
+    .org 04000h
+    .db "AB"             ; ID bytes
+    .dw init           	; cartridge initialization
+    .dw 0                ; statement handler (not used)
+    .dw 0                ; device handler (not used)
+    .dw 0                ; BASIC program in ROM (not used, especially not in page 1)
+    .dw 0,0,0            ; reserved
 
-;Local Labels
-; sass allows you to define local labels, which allows you to reuse common label names, such as "loop". You may preface any label name with "." to declare it as local, and it will be local within the prior global label. Example:
 
-global1:
-    ld a, b
-.local:
-    call .local
-global2:
-    ld b, a
-.local:
-    call .local ; Does not cause a Duplicate Name error
+init:
 
-global3:
-    ld b, a
-@@local:
-    call @@local ; Does not cause a Duplicate Name error
+	ei
+	halt
+	di
 
-  	db $7F		;[Instrument] 16
-	db $AA, $9E; volume slide
-	db $C0		;[Wait] 1
+	ld	hl,0
+	ld	[_SP_Storage],sp
+	ld	sp,ix
+	pop	af
+	pop	af
+	call replay_trigger
 
-	db $B4, $03; volume slide rep
-	db $C2		;[Wait] 3
-	db $0C		;[Note] 13
-	db $69		;[Volume] 9
-	db $AA, $9E; volume slide
-	db $C0		;[Wait] 1
-	db $B4, $04; volume slide rep
+;	map	0xc000
+;	.PAGE 3
+	.org 0xc000
+	
+_SP_Storage:		.ds 2			; to store the SP
+
+replay_trigger:		.ds 1			; trigger byte.
+replay_mainPSGvol:	.ds 2			; volume mixer for PSG SCC balance
+replay_mainSCCvol:	.ds 2			; volume mixer for PSG SCC balance
+;replay_songbase:		.ds 2			; pointer to song data
+replay_wavebase:		.ds 2			; pointer to waveform data
+replay_insbase:		.ds 2			; pointer to instrument data
+replay_orderpointer:	.ds 2			; pointer to the order track list pointers
+
+pattern:	.ds 1
