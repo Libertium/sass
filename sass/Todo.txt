@@ -14,6 +14,7 @@ TODO:
 (Cesc) Implementar la directiva .rom: els .org al rang 0x4000-0xBFFF fan que les dades al binari de sortida es generin en trams de 8Kb
 (Cesc) Revisar els ORG que no funcionen com es d'esperar
 (Cesc) Incorporar les directives subpage per poder generar megaroms:
+
 	megarom_bank0	.equ		04000h
 	megarom_bank1	.equ		06000h
 	megarom_bank2	.equ		08000h
@@ -22,6 +23,7 @@ TODO:
 	.subpage 2 at $8000	
 	.subpage 3 at $A000	
 
+	; JS80asm
 	defpage 0, 0x4000, 0x2000
     defpage 1, 0x6000, 0x2000
     defpage 2, 0x8000, 0x2000
@@ -36,37 +38,40 @@ TODO:
     defpage 15..63, 0xa000, 0x2000
 
     page 0..2
-    map 0xc000
+    map 0xc000	; ??
 
 
-    .ROM
-Define la cabecera para producir una ROM. Es imprescindible
-indicar antes la posición, que puede hacerse con la directiva .PAGE. También es
-conveniente indicar con la directiva .START el punto de inicio del programa.
- .MEGAROM [mapeador]
-Define la cabecera y estructura para producir
-una megaROM. Por defecto se define también la subpágina 0 del mapeador, por
-lo que no es necesario incluir ninguna instrucción ORG ni PAGE o SUBPAGE
-previa. Los tipos de mapeador soportado son los siguientes:
-o Konami: tamaño de subpágina de 8 KB, límite de 32 páginas. El tamaño
-máximo de la megaROM será de 256 KB (2 megabits). Entre 4000h y
-5FFFh está necesariamente la subpágina 0, es decir, no puede
-cambiarse.
-o KonamiSCC: tamaño de subpágina de 8 KB, límite de 64 páginas. El
-tamaño máximo de la megaROM será de 512 KB (4 megabits). Soporta
-acceso a SCC, el Sound Custom Chip de Konami.
-o ASCII8: tamaño de subpágina de 8 KB, límite de 256 páginas. El tamaño
-máximo de la megaROM será de 2048 KB (16 megabits, 2 megabytes).
-o ASCII16: tamaño de subpágina de 16 KB, límite de 256 páginas. El
-tamaño máximo de la megaROM será de 4096 KB (32 megabits, 4
-megabytes).
+	.ROM
+		Define la cabecera para producir una ROM. Es imprescindible indicar antes la posición, que puede hacerse 
+		con la directiva .PAGE. También es conveniente indicar con la directiva .START el punto de inicio del programa.
 
+ 	.MEGAROM [mapeador]
+		Define la cabecera y estructura para producir una megaROM. Por defecto se define también la subpágina 0 del mapeador, 
+		por lo que no es necesario incluir ninguna instrucción ORG ni PAGE o SUBPAGE previa. 
+		Los tipos de mapeador soportado son los siguientes:
+			o Konami: tamaño de subpágina de 8 KB, límite de 32 páginas. El tamaño máximo de la megaROM será 
+				de 256 KB (2 megabits). Entre 4000h y 5FFFh está necesariamente la subpágina 0, es decir, no puede cambiarse.
+			o KonamiSCC: tamaño de subpágina de 8 KB, límite de 64 páginas. El tamaño máximo de la megaROM será 
+				de 512 KB (4 megabits). Soporta acceso a SCC, el Sound Custom Chip de Konami.
+			o ASCII8: tamaño de subpágina de 8 KB, límite de 256 páginas. El tamaño máximo de la megaROM será 
+				de 2048 KB (16 megabits, 2 megabytes).
+			o ASCII16: tamaño de subpágina de 16 KB, límite de 256 páginas. El tamaño máximo de la megaROM será 
+				de 4096 KB (32 megabits, 4 megabytes).
 
-	.SIZE X Establece el tamaño del archivo resultante en Kilobytes.
 
 (Cesc) Directives PHASE -- DEPHASE per ensamblar codi al espai on es defineix pero declarant les adreces en un ambit diferent de forma que es pugui fer un reallocate a aquestes adreces.
-(Ok) Fer que als DB accepti nombres negatius
 
+	.PHASE X / .DEPHASE
+		Estas dos rutinas permiten utilizan direcciones virtuales de memoria. Es decir, ensamblar en una posición 
+		de memoria instrucciones que luego se ubicarán en otra. Puede ser útil para introducir código en una ROM que 
+		luego se tenga que copiar y ejecutar desde la RAM. Su efecto es que las etiquetas se ensamblarán de acuerdo con la dirección dada.
+
+	.DEPHASE revierte al estado normal, si bien cualquier instrucción ORG, PAGE, SUBPAGE tendrán el mismo efecto.
+
+	.SIZE X 
+		Establece el tamaño del archivo resultante en Kilobytes.
+
+(Ok) Fer que als DB accepti nombres negatius
 () Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
 () Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
 (Validar) Validar el calcul de expressions per exemple .equ value 0x1234 - 28
