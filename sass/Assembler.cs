@@ -50,14 +50,14 @@ namespace sass
 
 		public struct ORGItem
 		{
-			public ORGItem(uint adress, uint length)
+			public string ORGAdress;
+			public uint ORGLength;
+
+			public ORGItem(string adress, uint length)
 			{
 				ORGAdress = adress;
 				ORGLength = length;
 			}
-
-			public uint ORGAdress { get; private set; }
-			public uint ORGLength { get; private set; }
 		}
 
 
@@ -807,7 +807,7 @@ namespace sass
 						
 						// Cesc TODO el org no es comporta com esperem !!!
 						Console.WriteLine("<<PC: {0:X}, parameter {1} RootLineNumber{2}>>", PC, parameter, RootLineNumber);
-						ORGsList.Add(new ORGItem(PC, 0));
+						ORGsList.Add(new ORGItem(parameter, PC));
                         return listing;
 					case "verbose":
 						EnableVerbose = true;
