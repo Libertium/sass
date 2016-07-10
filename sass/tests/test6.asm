@@ -1,4 +1,12 @@
-﻿SINUS7:
+﻿.org	0x4000
+TRACK_REC_SIZE		.equ 38
+TRACK_Delay			.equ 34-17		; rows to wait till next data
+
+ld	[TRACK_Chan1+17+TRACK_Delay],a	
+TRACK_Chan1:		.ds TRACK_REC_SIZE
+
+/*
+SINUS7:
 	.db  0
 	.db  3
 	.db  6
@@ -258,3 +266,4 @@
 	.db	-1
 	.dw 	0
 	.dw	-1
+*/
