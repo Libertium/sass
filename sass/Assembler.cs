@@ -558,8 +558,12 @@ namespace sass
                                 instruction = instruction.Replace("%" + value.Key, ConvertToBinary(
                                     ExpressionEngine.Evaluate(value.Value.Value, entry.Address, entry.RootLineNumber),
 									value.Value.Bits, false, out truncated));
-                            if (truncated)
-                                entry.Error = AssemblyError.ValueTruncated;
+							
+							if (truncated){
+								/// Cesc
+                               // entry.Error = AssemblyError.ValueTruncated;
+								entry.Warning = AssemblyWarning.ValueTruncated;
+							}
                         }
                         catch (KeyNotFoundException)
                         {
@@ -583,7 +587,7 @@ namespace sass
             return output;
         }
 
-		private static string ConvertToBinary(ulong value, int bits, bool signed, out bool truncated) // Little endian octets
+		public static string ConvertToBinary(ulong value, int bits, bool signed, out bool truncated) // Little endian octets
         {
             ulong mask = 1;
             string result = "";

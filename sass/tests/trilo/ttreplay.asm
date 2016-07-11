@@ -1218,14 +1218,14 @@ _CHIPcmd11_morph_start:
 	ld	de,replay_morph_buffer
 	ld	a,32
 @@loop:
-	ex	af,af'	;'
+	ex	af,af'	
 	ld	a,[hl]
 	ld	[de],a		; copy value to both wave and delta pos
 	inc	de
 	ld	[de],a
 	inc	hl
 	inc	de
-	ex	af,af'	;'
+	ex	af,af'	
 	dec	a
 	jp	nz,@@loop
 	exx
@@ -1504,7 +1504,7 @@ _pcAY_noNoteTrigger:
 	ld	a,[ix+TRACK_Note]
 	add	a,[ix+TRACK_cmd_NoteAdd]
 	add	a
-	ex	af,af'			;'store the	note offset
+	ex	af,af'			;store the	note offset
 	ld	[ix+TRACK_cmd_NoteAdd],0	
 	
 
@@ -1677,7 +1677,7 @@ _pcAY_noToneAdd:
 	ld	[ix+TRACK_MacroPointer],l	;--- store pointer for next time
 	ld	[ix+TRACK_MacroPointer+1],h	
 
-	ex	af,af'			;';restore note offset
+	ex	af,af'			;restore note offset
 	ld	hl,[replay_Tonetable]
 	add	a,l
 	ld	l,a
@@ -2027,7 +2027,7 @@ _pcAY_cmdd_wave_cut:
 	res	B_TRGCMD,d		;[ix+TRACK_Flags]	; reset command
 	set	B_TRGWAV,d		;[ix+TRACK_Flags]	; reset normal wave update
 	ld	a,d
-	ex	af,af'		;'
+	ex	af,af'		
 
 	;get the waveform	start	in [DE]
 	ld	de,_0x9800
@@ -2070,7 +2070,7 @@ _pcAY_cmdd_wave_cut:
 	sub	32
 	neg	
 	ld	b,a
-	EX	AF,AF'		;'
+	EX	AF,AF'		
 	LD	D,A
 	jp	z,_pcAY_commandEND	
 	
@@ -2091,7 +2091,7 @@ _pcAY_cmde_wave_compr:
 	res	B_TRGCMD,d	;[ix+TRACK_Flags]	; reset command
 	set	B_TRGWAV,d	;[ix+TRACK_Flags]	; reset normal wave update
 	ld	a,d
-	ex	af,af'	;'
+	ex	af,af'	
 	
 	;get the waveform	start	in [DE]
 	ld	de,_0x9800
@@ -2150,7 +2150,7 @@ _wcomp_loop:
 	inc	de
 	djnz	@@loop
 	
-	EX	AF,AF'		;'
+	EX	AF,AF'		
 	LD	D,A	
 	jp	_pcAY_commandEND		
 	
@@ -2321,7 +2321,7 @@ scc_reg_update:
 	ld bc,0x9880
 	ld a,3*5+1
 loop:
-	ex af,af'	;'
+	ex af,af'	
 	ld a,[de]
 	cp [hl]
 	jr z,@@skip
@@ -2331,7 +2331,7 @@ loop:
 	inc hl
 	inc de
 	inc bc
-	ex af,af'		;'
+	ex af,af'		
 	dec a
 	jr nz, loop
 	ret

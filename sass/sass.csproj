@@ -21,7 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Commandlineparameters>--listing test.list --asmsx tests/org/test.asm</Commandlineparameters>
+    <Commandlineparameters>--listing test.list --asmsx tests/trilo/main.asm --cv</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>

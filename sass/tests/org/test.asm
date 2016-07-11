@@ -1,4 +1,6 @@
 
+;.verbose
+
 .rom
 .page 1
 .start init
@@ -7,7 +9,7 @@
 	.db -1
 	.dw -257
 
-TRACK_Instrument_CESC		.equ 0-17
+TRACK_Instrument_CESC		.equ -17
 	ld hl,TRACK_Instrument_CESC
 initmain:
 
