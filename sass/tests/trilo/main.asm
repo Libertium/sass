@@ -9,6 +9,8 @@
 	.start	initmain
 	.dw	0,0,0,0,0,0	
 
+	;.verbose
+
 /*
 	.rom 
 ;	.page 1
@@ -22,8 +24,6 @@
     .dw 0,0,0            ; reserved
  	.dw	0,0,0,0,0,0	
 */
- 	   
-initmain:
 
 	ei
 	halt

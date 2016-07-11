@@ -65,10 +65,7 @@ megarom_bank3	.equ		0A000h
      ;.verbose
 
 
-     .org 04010h
-
-
-
+     .org 04020h
 
 ;; set pages and subslot
 main:
@@ -118,6 +115,7 @@ init:   call RSLREG			;bios.RSLREG
 ; (check "block1" label in assembler list output to see if that's the case)
 
 		;.subpage 1 at $6000	
+		.page 2
 block1:
 screen2:
         ld hl,0f3e9h                                   ; Color 15,0,0
@@ -197,7 +195,7 @@ HACK:
 .echo $
 ;.fill 1024-$, 0xfe  ;aixo fa cascar orrorosament docs 1024< $ per tant dona un valor de 32 o 64 bits negatiu
 
-.ds 0x2000-$, 0xEE
+;.ds 0x2000-$, 0xEE
 
 .ds 08000h-$,0EEh
 

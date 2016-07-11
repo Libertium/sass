@@ -1,3 +1,11 @@
+/* Megarom:
+Just be careful that size of empty space remaining in block(s) (8KB) is calculated correctly. 
+Also note that enabling the megaROM in 8000-BFFFh area is something you have to do yourself, 
+before using it (unless you want to use RAM there). Check for example some existing megaROMs 
+to see how they determine what slot they're in. And other than for 4000-5FFFh area, megaROM 
+blocks may not be initialized after a reset (depending on cartridge type). If you ignore this, 
+you may get a MegaROM that works fine on emulators but not (reliable) on real hardware.*/
+
 megarom_bank0	.equ		04000h
 megarom_bank1	.equ		06000h
 megarom_bank2	.equ		08000h
@@ -103,14 +111,22 @@ block2:
 		.subpage 3 at $A000	
 		ld	a,0
 		ret
+*/
 
+/*
+You seem to rely on assembler directives to produce the code. Maybe that's easier, but you don't need it,
+ MSX cartridges are really simple from a programmer's perspective. It does however:
 
-; You seem to rely on assembler directives to produce the code. Maybe that's easier, but you don't need it, MSX cartridges are really simple from a programmer's perspective. It does however:
-
-; Make sure that to other people reading your code, it may not be clear what's going on.
-; Make it impossible to assemble your code using other assemblers. Which makes it difficult for others to help, AND creates (unnecessary) problems should you ever decide to use another assembler.
-; Something like this should be clear to any assembler, and easy to read for Z80 programmers:
-
-; In other ROM blocks, you can use "org" assembler statements to set program counter at addresses where you plan to access these blocks. Just be careful that size of empty space remaining in block(s) is calculated correctly. Also note that enabling the megaROM in 8000-BFFFh area is something you have to do yourself, before using it (unless you want to use RAM there). Check for example some existing megaROMs to see how they determine what slot they're in. And other than for 4000-5FFFh area, megaROM blocks may not be initialized after a reset (depending on cartridge type). If you ignore this, you may get a MegaROM that works fine on emulators but not (reliable) on real hardware.
-; Btw - didn't check what graphics stuff you're trying to do, I'm not much of an MSX graphics coder... 
+	Make sure that to other people reading your code, it may not be clear what's going on.
+	Make it impossible to assemble your code using other assemblers. Which makes it difficult for others 
+	to help, AND creates (unnecessary) problems should you ever decide to use another assembler.
+	Something like this should be clear to any assembler, and easy to read for Z80 programmers:
+	In other ROM blocks, you can use "org" assembler statements to set program counter at addresses 
+	where you plan to access these blocks. Just be careful that size of empty space remaining in block(s) 
+	is calculated correctly. Also note that enabling the megaROM in 8000-BFFFh area is something you 
+	have to do yourself, before using it (unless you want to use RAM there). Check for example some 
+	existing megaROMs to see how they determine what slot they're in. And other than for 4000-5FFFh area, 
+	megaROM blocks may not be initialized after a reset (depending on cartridge type). If you ignore this, 
+	you may get a MegaROM that works fine on emulators but not (reliable) on real hardware.
+	Btw - didn't check what graphics stuff you're trying to do, I'm not much of an MSX graphics coder... 
 */

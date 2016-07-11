@@ -85,7 +85,11 @@ namespace sass
 
                             case "-l":
                             case "--listing":
-                                settings.ListingOutput = args[++i];
+								if( !args[i+1].StartsWith("-"))
+                                	settings.ListingOutput = args[++i];
+								else
+									Console.WriteLine("!!--listing whithout parameter !!");
+							
                                 break;
                             case "--list-encodings":
                                 Console.WriteLine("The default encoding is UTF-8. The following are available: ");
@@ -107,6 +111,7 @@ namespace sass
                             case "-v":
                             case "--verbose":
                                 settings.Verbose = true;
+								Console.WriteLine("Verbose:");
                                 break;
                         }
                     }
@@ -177,7 +182,7 @@ namespace sass
 				output = assembler.Assemble (file, inputFile);
 				watch.Stop ();
 			
-				settings.Verbose = assembler.EnableVerbose;
+				settings.Verbose = settings.Verbose | assembler.EnableVerbose;
 
 				if (outputFile == "-")
 					Console.OpenStandardOutput ().Write (output.Data, 0, output.Data.Length);
@@ -230,6 +235,15 @@ namespace sass
             }
         }
 
+		/// <summary>
+		/// Generates the listing.
+		/// Listing format looks something like this:
+		/// file.asm/1 (0x1234): DE AD BE EF    ld a, 0xBEEF
+		/// file.asm/2 (0x1236):              label:
+		/// file.asm/3 (0x1236):              #directive
+		/// </summary>
+		/// <returns>The listing.</returns>
+		/// <param name="output">Output.</param>
         public static string GenerateListing(AssemblyOutput output)
         {
             // I know this can be optimized, I might optmize it eventually
@@ -241,15 +255,13 @@ namespace sass
                         return 0;
                     return l.Output.Length * 3 - 1;
                 });
+			maxBinaryLength = 8;
             int addressLength = output.InstructionSet.WordSize / 4 + 2;
             string formatString = "{0,-" + maxFileLength + "}:{1,-" + maxLineNumber + "} ({2}): {3,-" + maxBinaryLength + "}  {4}" + Environment.NewLine;
             string errorFormatString = "{0,-" + maxFileLength + "}:{1,-" + maxLineNumber + "} {2}: {3}" + Environment.NewLine;
             string addressFormatString = "X" + addressLength;
-            // Listing format looks something like this:
-            // file.asm/1 (0x1234): DE AD BE EF    ld a, 0xBEEF
-            // file.asm/2 (0x1236):              label:
-            // file.asm/3 (0x1236):              #directive
-            var builder = new StringBuilder();
+
+			var builder = new StringBuilder();
             string file, address, binary, code;
             int line;
             foreach (var entry in output.Listing)

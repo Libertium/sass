@@ -1,16 +1,26 @@
 ﻿
-TODO:
+TODO: actualitzat el 11-7-2016
 =====
 
 (Ok) Resoldre problema de linia amb comentari que dona error al ensamblar
 (Ok) Modificador --asmsx per compatibilitzar el codi generat per aquest ensamblador
 (Ok) les etiquetes locals .label: sembla que no funcionen be, i cal validar-ho 
-(Ok) fer que el format @@label: sigui sinonim de .label: 
+(Ok) fer que el format @@label: sigui sinonim de .label: amb el modificador --asmsx
 (Ok) Validar els DB amb les musiques de WD per veure que totes les ensambla correctament
 (Ok) Poder fer un incbin per incorporar binaris, i admetre offset i size.
 (Ok) Al incbin fer que el PC s'actualitzi amb la mida dels bytes afegits.
 (Ok) Fer que .ds sigui sinonim del .fill
 (Ok) Si hi ha un tab entre el .org i la adreça 04600h el org es ignorat
+(Ok) Fer que als DB accepti nombres negatius
+(Ok) Als include no fa @@label: sigui sinonim de .label: amb el modificador --asmsx
+(Ok) Als .fill o .ds detectar i limitar el tamany a un maxim de 0xFFFF
+() Als .block detectar i limitar el tamany a un maxim de 0xFFFF
+() Problema al avaluar les expresions negatives:
+	TRACK_Instrument_CESC		.equ 0-17
+	ld hl,TRACK_Instrument_CESC	--> Error: ValueTruncated
+(Validar) Validar el calcul de expressions per exemple .equ value 0x1234 - 28
+() Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
+() Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
 (Cesc) Implementar la directiva .rom: els .org al rang 0x4000-0xBFFF fan que les dades al binari de sortida es generin en trams de 8Kb
 (Cesc) Revisar els ORG que no funcionen com es d'esperar
 (Cesc) Incorporar les directives subpage per poder generar megaroms:
@@ -58,7 +68,6 @@ TODO:
 			o ASCII16: tamaño de subpágina de 16 KB, límite de 256 páginas. El tamaño máximo de la megaROM será 
 				de 4096 KB (32 megabits, 4 megabytes).
 
-
 (Cesc) Directives PHASE -- DEPHASE per ensamblar codi al espai on es defineix pero declarant les adreces en un ambit diferent de forma que es pugui fer un reallocate a aquestes adreces.
 
 	.PHASE X / .DEPHASE
@@ -70,8 +79,3 @@ TODO:
 
 	.SIZE X 
 		Establece el tamaño del archivo resultante en Kilobytes.
-
-(Ok) Fer que als DB accepti nombres negatius
-() Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
-() Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
-(Validar) Validar el calcul de expressions per exemple .equ value 0x1234 - 28

@@ -34,6 +34,8 @@ namespace sass
 
 		public bool EnableVerbose { get; set; }
 
+		private string moduleNamespace = "";
+
 		/// <summary>
 		/// Cesc: Only for testing purposes <see cref="sass.Assembler"/> cesc verbose.
 		/// </summary>
@@ -50,16 +52,17 @@ namespace sass
 
 		public struct ORGItem
 		{
-			public string ORGAdress;
+			public uint ORGAdress;
 			public uint ORGLength;
+			public uint Subpage;
 
-			public ORGItem(string adress, uint length)
+			public ORGItem(uint adress, uint endAdress, uint subpage)
 			{
 				ORGAdress = adress;
-				ORGLength = length;
+				ORGLength = endAdress;
+				Subpage = subpage;
 			}
 		}
-
 
         public Assembler(InstructionSet instructionSet, AssemblySettings settings)
         {
@@ -448,6 +451,8 @@ namespace sass
 					}
                 }
             }
+			addToORGList(PC, 0,0);
+			ORGsList.Remove (ORGsList.Last ());
             return Finish(Output);
         }
 
@@ -485,11 +490,16 @@ namespace sass
         {
             var finalBinary = new List<byte>();
             ExpressionEngine.LastGlobalLabel = null;
+			foreach(ORGItem item in ORGsList)
+			{
+				Console.WriteLine ("ORG: 0x{0:X}-0x{1:X}", item.ORGAdress, item.ORGLength);				
+			}
+
             for (int i = 0; i < output.Listing.Count; i++)
             {
                 var entry = output.Listing[i];
 				/// Cesc
-				// Console.WriteLine(entry.FileName + " " + entry.LineNumber + " " + entry.Instruction);
+				//Console.WriteLine(">> {0} {1} {2} \t\t {3}", entry.FileName, entry.LineNumber, entry.Code, entry.Instruction, entry.Output);
                 RootLineNumber = entry.RootLineNumber;
                 PC = entry.Address;
                 LineNumbers = new Stack<int>(new[] { entry.LineNumber });
@@ -608,6 +618,19 @@ namespace sass
             return little;
         }
 
+		private void addToORGList(uint currentPC, uint PC, uint subpage)
+		{
+			//ORGsList.Add(new ORGItem(paramter, currentPC));
+			if (ORGsList.Count > 0) {
+				ORGItem last = ORGsList.Last ();
+				ORGsList.Remove (last);
+				ORGsList.Add (new ORGItem (last.ORGAdress, currentPC, subpage));
+				ORGsList.Add (new ORGItem (PC, PC, subpage));
+			} else { 
+				ORGsList.Add (new ORGItem (PC, currentPC, subpage));
+			}
+		}
+
         #region Directives
 
         private Listing HandleDirective(string line, bool passTwo = false)
@@ -639,12 +662,12 @@ namespace sass
 
 			// Cesc
 			// if (passTwo) Console.WriteLine ("Pass Two");
-
             try
             {
                 switch (directive)
                 {
 					case "rom":
+					{
 						if (parameters.Length != 0)
 						{
 							listing.Error = AssemblyError.InvalidDirective;
@@ -655,8 +678,9 @@ namespace sass
 							IsROM = true;
 							return listing;
 						}
-
+					}
 					case "megarom":
+					{
 					if (parameters.Length == 0)
 						{
 							listing.Error = AssemblyError.InvalidDirective;
@@ -671,147 +695,166 @@ namespace sass
 							IsMegaROM = true;
 							return listing;
 						}
-
+					}
                     case "block":
-                        {
-                            ulong amount = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
-                            listing.Output = new byte[amount];
-                            PC += (uint)amount;
-                            return listing;
-                        }
+                    {
+                        ulong amount = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+                        listing.Output = new byte[amount];
+                        PC += (uint)amount;
+                        return listing;
+                    }
                     case "byte":
                     case "db":
+                    {
+                        if (passTwo)
                         {
-                            if (passTwo)
+                            var result = new List<byte>();
+                            parameters = parameter.SafeSplit(',');
+                            foreach (var p in parameters)
                             {
-                                var result = new List<byte>();
-                                parameters = parameter.SafeSplit(',');
-                                foreach (var p in parameters)
+                                if (p.Trim().StartsWith("\"") && p.Trim().EndsWith("\""))
+                                    result.AddRange(
+										Settings.Encoding.GetBytes(p.Trim().Substring(1, p.Trim().Length - 2).Unescape()));
+                                else
                                 {
-                                    if (p.Trim().StartsWith("\"") && p.Trim().EndsWith("\""))
-                                        result.AddRange(
-											Settings.Encoding.GetBytes(p.Trim().Substring(1, p.Trim().Length - 2).Unescape()));
-                                    else
+                                    try
                                     {
-                                        try
-                                        {
-                                            result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));
-                                        }
-                                        catch (KeyNotFoundException)
-                                        {
-                                            listing.Error = AssemblyError.UnknownSymbol;
-                                        }
+                                        result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));
+                                    }
+                                    catch (KeyNotFoundException)
+                                    {
+                                        listing.Error = AssemblyError.UnknownSymbol;
                                     }
                                 }
-                                listing.Output = result.ToArray();
-                                return listing;
                             }
-                            else
-                            {
-                                parameters = parameter.SafeSplit(',');
-                                int length = 0;
-                                foreach (var p in parameters)
-                                {
-                                    if (p.StartsWith("\"") && p.EndsWith("\""))
-                                        length += p.Substring(1, p.Length - 2).Unescape().Length;
-                                    else
-                                        length++;
-                                }
-                                listing.Output = new byte[length];
-                                listing.PostponeEvalulation = true;
-                                PC += (uint)listing.Output.Length;
-                                return listing;
-                            }
+                            listing.Output = result.ToArray();
+                            return listing;
                         }
+                        else
+                        {
+                            parameters = parameter.SafeSplit(',');
+                            int length = 0;
+                            foreach (var p in parameters)
+                            {
+                                if (p.StartsWith("\"") && p.EndsWith("\""))
+                                    length += p.Substring(1, p.Length - 2).Unescape().Length;
+                                else
+                                    length++;
+                            }
+                            listing.Output = new byte[length];
+                            listing.PostponeEvalulation = true;
+                            PC += (uint)listing.Output.Length;
+                            return listing;
+                        }
+                    }
                     case "word":
                     case "dw":
+                    {
+                        if (passTwo)
                         {
-                            if (passTwo)
-                            {
-                                var result = new List<byte>();
-                                parameters = parameter.SafeSplit(',');
-                                foreach (var item in parameters)
-                                    result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
-                                listing.Output = result.ToArray();
-                                return listing;
-                            }
-                            else
-                            {
-								// Cesc: resoldre el bug .dw 0,0,0 
-								parameters = parameter.SafeSplit(',');
-
-                                listing.Output = new byte[parameters.Length * (InstructionSet.WordSize / 8)];
-                                listing.PostponeEvalulation = true;
-                                PC += (uint)listing.Output.Length;
-                                return listing;
-                            }
+                            var result = new List<byte>();
+                            parameters = parameter.SafeSplit(',');
+                            foreach (var item in parameters)
+                                result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
+                            listing.Output = result.ToArray();
+                            return listing;
                         }
+                        else
+                        {
+							// Cesc: resoldre el bug .dw 0,0,0 
+							parameters = parameter.SafeSplit(',');
+
+                            listing.Output = new byte[parameters.Length * (InstructionSet.WordSize / 8)];
+                            listing.PostponeEvalulation = true;
+                            PC += (uint)listing.Output.Length;
+                            return listing;
+                        }
+                    }
                     case "error":
                     case "echo":
+					case "print":
+					case "printtext":
+                    {
+                        if (passTwo)
                         {
-                            if (passTwo)
+                            string output = "";
+                            bool formatOutput = false;
+                            List<object> formatParameters = new List<object>();
+                            foreach (var item in parameters)
                             {
-                                string output = "";
-                                bool formatOutput = false;
-                                List<object> formatParameters = new List<object>();
-                                foreach (var item in parameters)
+                                if (item.Trim().StartsWith("\"") && item.EndsWith("\""))
                                 {
-                                    if (item.Trim().StartsWith("\"") && item.EndsWith("\""))
-                                    {
-                                        output += item.Substring(1, item.Length - 2);
-                                        formatOutput = true;
-                                    }
+                                    output += item.Substring(1, item.Length - 2);
+                                    formatOutput = true;
+                                }
+                                else
+                                {
+                                    if (!formatOutput)
+                                        output += ExpressionEngine.Evaluate(item, PC, RootLineNumber);
                                     else
                                     {
-                                        if (!formatOutput)
-                                            output += ExpressionEngine.Evaluate(item, PC, RootLineNumber);
-                                        else
-                                        {
-                                            formatParameters.Add(ExpressionEngine.Evaluate(item, PC, RootLineNumber));
-                                        }
+                                        formatParameters.Add(ExpressionEngine.Evaluate(item, PC, RootLineNumber));
                                     }
                                 }
-                                if (formatOutput)
-                                    output = string.Format(output, formatParameters.ToArray());
-                                Console.WriteLine((directive == "error" ? "User Error: " : "") + output);
-                                return listing;
                             }
-                            else
-                            {
-                                listing.PostponeEvalulation = true;
-                                return listing;
-                            }
+                            if (formatOutput)
+                                output = string.Format(output, formatParameters.ToArray());
+                            Console.WriteLine((directive == "error" ? "User Error: " : "") + output);
+                            return listing;
                         }
-                        //break;
+                        else
+                        {
+                            listing.PostponeEvalulation = true;
+                            return listing;
+                        }
+						//break;
+                    }
                     case "end":
+					{
+						// end
                         return listing;
-                    
+					}
 					/// Cesc
 					case "ds":
 					case "fill":
+                    {
+                        parameters = parameter.SafeSplit(',');
+                        ulong amount = ExpressionEngine.Evaluate(parameters[0], PC, RootLineNumber);
+                        if (parameters.Length == 1)
                         {
-                            parameters = parameter.SafeSplit(',');
-                            ulong amount = ExpressionEngine.Evaluate(parameters[0], PC, RootLineNumber);
-                            if (parameters.Length == 1)
-                            {
-                                Array.Resize<string>(ref parameters, 2);
-                                parameters[1] = "0";
-                            }
+                            Array.Resize<string>(ref parameters, 2);
+                            parameters[1] = "0";
+                        }
+						//Cesc
+						if(amount <= 0xffff)
+						{
                             listing.Output = new byte[amount];
                             for (int i = 0; i < (int)amount; i++)
                                 listing.Output[i] = (byte)ExpressionEngine.Evaluate(parameters[1], PC++, RootLineNumber);
-                            return listing;
-                        }
+                            
+						}
+						else
+						{
+							Console.WriteLine(".fill or .ds too big:{0} at line:{1}, param:{2}",
+								amount, RootLineNumber, parameter);
+						}
+						return listing;
+                    }
                     case "org":
+					{
+						uint currentPC = PC;
                         PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
-						
+
 						// Cesc TODO el org no es comporta com esperem !!!
-						Console.WriteLine("<<PC: {0:X}, parameter {1} RootLineNumber{2}>>", PC, parameter, RootLineNumber);
-						ORGsList.Add(new ORGItem(parameter, PC));
+						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+							PC, parameter, RootLineNumber,currentPC);
+						addToORGList(currentPC, PC,0);
+						
                         return listing;
-
+					}
                     case "page":
-
+					{
+						uint currentPC = PC;
                         ulong page = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
                         switch (page)
                         {
@@ -828,52 +871,58 @@ namespace sass
                                 PC = 0xc000;
                                 break;
                         }
-
+						// Cesc TODO el org no es comporta com esperem !!!
+						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+							PC, parameter, RootLineNumber, currentPC);
+						addToORGList(currentPC, PC,0);
                         return listing;
-
+					}
 					case "verbose":
+					{
 						EnableVerbose = true;
 						break;
+					}
                     case "include":
+                    {
+                        string file = GetIncludeFile(parameter);
+                        if (file == null)
                         {
-                            string file = GetIncludeFile(parameter);
-                            if (file == null)
-                            {
-                                listing.Error = AssemblyError.FileNotFound;
-                                return listing;
-                            }
-                            FileNames.Push(Path.GetFileName(parameter.Substring(1, parameter.Length - 2)));
-                            LineNumbers.Push(0);
-                            string includedFile = File.ReadAllText(file) + "\n.endfile";
-
-							// Cesc Eliminar els comentaris del tipus /* */ o //
-							Console.WriteLine("Include: "+file);
-							if (ASMSX){
-								var blockComments = @"/\*(.*?)\*/";
-								var lineComments = @"//(.*?)\r?\n";
-								var strings = @"""((\\[^\n]|[^""\n])*)""";
-								var verbatimStrings = @"@(""[^""]*"")+";
-
-								includedFile = Regex.Replace(includedFile,
-								blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
-								me => {
-									if (me.Value.StartsWith("/*") || me.Value.StartsWith("//"))
-										return me.Value.StartsWith("//") ? Environment.NewLine : "";
-									// Keep the literal strings
-									return me.Value;
-								},
-								RegexOptions.Singleline);
-							}
-
-                            string[] lines = includedFile.Replace("\r", "").Split('\n');
-
-                            Lines =
-                                Lines.Take(CurrentIndex + 1)
-                                     .Concat(lines)
-                                     .Concat(Lines.Skip(CurrentIndex + 1))
-                                     .ToArray();
+                            listing.Error = AssemblyError.FileNotFound;
                             return listing;
                         }
+                        FileNames.Push(Path.GetFileName(parameter.Substring(1, parameter.Length - 2)));
+                        LineNumbers.Push(0);
+                        string includedFile = File.ReadAllText(file) + "\n.endfile";
+
+						// Cesc Eliminar els comentaris del tipus /* */ o //
+						Console.WriteLine("Include: "+file);
+						if (ASMSX){
+							var blockComments = @"/\*(.*?)\*/";
+							var lineComments = @"//(.*?)\r?\n";
+							var strings = @"""((\\[^\n]|[^""\n])*)""";
+							var verbatimStrings = @"@(""[^""]*"")+";
+
+							includedFile = Regex.Replace(includedFile,
+							blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
+							me => {
+								if (me.Value.StartsWith("/*") || me.Value.StartsWith("//"))
+									return me.Value.StartsWith("//") ? Environment.NewLine : "";
+								// Keep the literal strings
+								return me.Value;
+							},
+							RegexOptions.Singleline);
+						}
+						if (ASMSX)
+							includedFile = includedFile.Replace ("@@", ".");						
+						
+						string[] lines = includedFile.Replace("\r", "").Replace('\t',' ').Split('\n');
+                        Lines =
+                            Lines.Take(CurrentIndex + 1)
+                                 .Concat(lines)
+                                 .Concat(Lines.Skip(CurrentIndex + 1))
+                                 .ToArray();
+                        return listing;
+                    }
 					/// Cesc
 					case "incbin":
 					{
@@ -967,13 +1016,30 @@ namespace sass
 						}
 						break;
 					}
-					
                     case "endfile": // Special, undocumented directive
+					{
                         RootLineNumber--;
                         LineNumbers.Pop();
                         FileNames.Pop();
                         return null;
+					}
+					case "module":
+					{
+						moduleNamespace = parameter;
+						break;
+					}
+					case "endmodule":
+					{
+						if (moduleNamespace != ""){
+							moduleNamespace = "";
+						}
+						else{
+							Console.WriteLine("Error .endmodule: missing .module");
+						}
+						break;
+					}
                     case "equ":
+					{
                         if (parameters.Length == 1)
                         {
                             if (ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower()))
@@ -990,16 +1056,29 @@ namespace sass
                                 listing.Error = AssemblyError.DuplicateName;
                                 return listing;
                             }
-                            ExpressionEngine.Symbols.Add(parameters[0].ToLower(), new Symbol(
-                                                                                      (uint)
-                                                                                      ExpressionEngine.Evaluate(
-                                                                                          parameter.Substring(
-                                                                                              parameter.IndexOf(' ') + 1)
-                                                                                                   .Trim(), PC,
-                                                                                          RootLineNumber)));
+
+							/// Cesc: append module name
+							string label = parameters[0].ToLower();
+							if (moduleNamespace != "")
+								label = moduleNamespace +"."+label;
+
+							/*foreach (var item in parameters)
+								result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
+							listing.Output = result.ToArray();
+							return listing;*/
+
+
+                            ExpressionEngine.Symbols.Add(label, new Symbol(
+								(uint) ExpressionEngine.Evaluate(
+                                  parameter.Substring(
+                                      parameter.IndexOf(' ') + 1)
+                                           .Trim(), PC,
+									RootLineNumber)));
                         }
                         return listing;
+					}
                     case "exec":
+					{
                         if (parameters.Length == 0 || !AllowExec)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1017,7 +1096,9 @@ namespace sass
                             PC += (uint)listing.Output.Length;
                             return listing;
                         }
+					}
                     case "define":
+					{
                         if (parameters.Length == 1)
                         {
                             if (ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower()))
@@ -1056,7 +1137,9 @@ namespace sass
                             Macros.Add(macro);
                         }
                         return listing;
+					}
                     case "if":
+					{
                         if (parameters.Length == 0)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1080,43 +1163,45 @@ namespace sass
                             listing.Error = AssemblyError.UnknownSymbol;
                         }
                         return listing;
+					}
                     case "ifdef":
+                    {
+                        if (parameters.Length != 1)
                         {
-                            if (parameters.Length != 1)
-                            {
-                                listing.Error = AssemblyError.InvalidDirective;
-                                return listing;
-                            }
-                            if (!IfStack.Peek())
-                            {
-                                WorkingIfStack.Push(false);
-                                return listing;
-                            }
-                            var result = ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower());
-                            if (!result)
-                                result = Macros.Any(m => m.Name.ToLower() == parameters[0].ToLower());
-                            IfStack.Push(result);
+                            listing.Error = AssemblyError.InvalidDirective;
                             return listing;
                         }
+                        if (!IfStack.Peek())
+                        {
+                            WorkingIfStack.Push(false);
+                            return listing;
+                        }
+                        var result = ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower());
+                        if (!result)
+                            result = Macros.Any(m => m.Name.ToLower() == parameters[0].ToLower());
+                        IfStack.Push(result);
+                        return listing;
+                    }
                     case "ifndef":
+                    {
+                        if (parameters.Length != 1)
                         {
-                            if (parameters.Length != 1)
-                            {
-                                listing.Error = AssemblyError.InvalidDirective;
-                                return listing;
-                            }
-                            if (!IfStack.Peek())
-                            {
-                                WorkingIfStack.Push(false);
-                                return listing;
-                            }
-                            var result = ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower());
-                            if (!result)
-                                result = Macros.Any(m => m.Name.ToLower() == parameters[0].ToLower());
-                            IfStack.Push(!result);
+                            listing.Error = AssemblyError.InvalidDirective;
                             return listing;
                         }
+                        if (!IfStack.Peek())
+                        {
+                            WorkingIfStack.Push(false);
+                            return listing;
+                        }
+                        var result = ExpressionEngine.Symbols.ContainsKey(parameters[0].ToLower());
+                        if (!result)
+                            result = Macros.Any(m => m.Name.ToLower() == parameters[0].ToLower());
+                        IfStack.Push(!result);
+                        return listing;
+                    }
                     case "endif":
+					{
                         if (parameters.Length != 0)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1134,7 +1219,9 @@ namespace sass
                         }
                         IfStack.Pop();
                         return listing;
+					}
                     case "else":
+					{
                         if (parameters.Length != 0)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1153,7 +1240,9 @@ namespace sass
                     //        return listing;
                     //    }
                     //    return listing;
+					}
                     case "ascii":
+					{
                         if (parameters.Length == 0)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1167,7 +1256,9 @@ namespace sass
                         parameter = parameter.Substring(1, parameter.Length - 2);
                         listing.Output = Settings.Encoding.GetBytes(parameter.Unescape());
                         return listing;
+					}
                     case "asciiz":
+					{
 						if (passTwo)
 						{
 							var result = new List<byte>();
@@ -1202,7 +1293,9 @@ namespace sass
 							return listing;
 						}
 						//break; //Cesc unreachable code
+					}
                     case "asciip":
+					{
 						if (passTwo)
 						{
 							var result = new List<byte>();
@@ -1237,13 +1330,19 @@ namespace sass
 							return listing;
 						}
 						//break; //Cesc unrecheable code
+					}
                     case "nolist":
+					{
                         Listing = false;
                         return listing;
+					}
                     case "list":
+					{
                         Listing = true;
                         return listing;
+					}
                     case "undefine":
+					{
                         if (parameters.Length == 0)
                         {
                             listing.Error = AssemblyError.InvalidDirective;
@@ -1262,6 +1361,7 @@ namespace sass
                             }
                         }
                         return listing;
+					}
                 }
             }
             catch (KeyNotFoundException)
@@ -1274,8 +1374,13 @@ namespace sass
                 listing.Error = AssemblyError.InvalidExpression;
                 return listing;
             }
+			// Cesc
+			catch(Exception ex) {
+				Console.WriteLine ("Cesc Exception: {0}", ex.Message);
+			}
             return null;
         }
+
 
         private string GetIncludeFile(string file)
         {
@@ -1296,7 +1401,7 @@ namespace sass
             var array = BitConverter.GetBytes(value);
             return array.Take(InstructionSet.WordSize / 8).ToArray();
         }
-
+			
         #endregion
     }
 }
