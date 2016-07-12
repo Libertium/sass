@@ -92,6 +92,9 @@
     <Content Include="tests\test5.asm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="tests\test_dir_negative.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="tests\trilo\voltable_combined.bin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -155,10 +158,5 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-  <ItemGroup>
-    <Folder Include="tests\incbin\" />
-    <Folder Include="tests\org\" />
-    <Folder Include="tests\rom\" />
-    <Folder Include="tests\megarom\" />
-  </ItemGroup>
+  <ItemGroup />
 </Project>
