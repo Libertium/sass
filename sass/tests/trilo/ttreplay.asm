@@ -1504,7 +1504,8 @@ _pcAY_noNoteTrigger:
 	ld	a,[ix+TRACK_Note]
 	add	a,[ix+TRACK_cmd_NoteAdd]
 	add	a
-	ex	af,af'			;store the	note offset
+	;ex	af,af'			;store the	note offset
+	ex af,af'	
 	ld	[ix+TRACK_cmd_NoteAdd],0	
 	
 
@@ -1625,9 +1626,10 @@ _noVolume:
 	ld	a,[hl]	; get	the deviation	
 	inc	hl
 	bit	6,e
-	jp	z,@@skip
+	jp	z,.skip
 	add	[ix+TRACK_Noise]
-@@skip:	ld	[ix+TRACK_Noise],a
+.skip:	
+	ld	[ix+TRACK_Noise],a
 	ld	[AY_regNOISE],a
 	
 _noNoise:
@@ -1677,7 +1679,8 @@ _pcAY_noToneAdd:
 	ld	[ix+TRACK_MacroPointer],l	;--- store pointer for next time
 	ld	[ix+TRACK_MacroPointer+1],h	
 
-	ex	af,af'			;restore note offset
+	;restore note offset
+	ex	af,af'			
 	ld	hl,[replay_Tonetable]
 	add	a,l
 	ld	l,a
@@ -1965,7 +1968,7 @@ _pcAY_cmda_dec:
 _pcAY_cmda_inc:
 	cp	0x78
 	ret	z
-	add	8	
+	add	a,8	
 	ld	[ix+TRACK_cmd_VolumeAdd],a
 	ret
 	
@@ -2126,7 +2129,7 @@ _pcAY_cmde_wave_compr:
 	rrca	; x32
 	rrca
 	rrca
-	add	31
+	add	a,31
 	ld	iyl,a		; fraction
 	xor	a	
 _wcomp_loop:
@@ -2229,7 +2232,7 @@ replay_route:
 _comp_loop:	
 	out	[c],b
 	ld	a,[hl]
-	add	1
+	add	a,1
 	out	[0xa1],a
 	inc	hl
 	ld	a,[hl]
@@ -2503,7 +2506,7 @@ _rpm_next_step:
 	;-- apply the delta's
 	ld	a,[replay_morph_counter]
 	ld	c,a
-	add	16
+	add	a,16
 	ld	[replay_morph_counter],a
 	jp	nz,@@skip
 	;--- end morph

@@ -18,19 +18,6 @@ namespace sass
 
         public static int Main(string[] args)
         {
-			long equ = 4294967279;
-			bool truncated = false;
-			string bin = Assembler.ConvertToBinary(4294967279,	16, false, out truncated);
-			bin = Assembler.ConvertToBinary(37279,	16, false, out truncated);
-			bin = Assembler.ConvertToBinary(37279,	16, true, out truncated);
-			bin = Assembler.ConvertToBinary(65537,	16, false, out truncated);
-
-			var array = BitConverter.GetBytes(4294967279);
-			var ret = array.Take(16 / 8).ToArray();
-			short var = BitConverter.ToInt16 (ret, 0);
-		
-			var = (short)equ;
-
             InstructionSets = new Dictionary<string, InstructionSet>();
 			InstructionSets.Add("z80", LoadInternalSet("sass.Tables.z80.table"));
             InstructionSets.Add("z80alt", LoadInternalSet("sass.Tables.z80alt.table"));
@@ -209,8 +196,9 @@ namespace sass
 					foreach (var listing in errors) {
 						if (listing.Error != AssemblyError.None)
 							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Error: " + listing.Error +". Code: " + listing.Code);
-						if (listing.Warning != AssemblyWarning.None)
-							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning +". Code: " + listing.Code);
+						/// Cesc TODO: de moment comentat per no molestar, cal tornar a activar-ho i fer un condicional
+						//if (listing.Warning != AssemblyWarning.None)
+						//	Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning +". Code: " + listing.Code);
 					}
 				}
 			

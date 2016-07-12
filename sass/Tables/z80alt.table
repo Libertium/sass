@@ -293,12 +293,18 @@ INS ADC_HL-,-@A<g6>                     11101101 01@A1010
 INS ADC_A-,-%A<8>                       11001110 %A
     INS ADC_%A<8>                       11001110 %A
 
+# Cesc: ADD A,[IX+n]:
+INS ADD_A-,-[-@B<g8>-+-%A<8>-]      @B 10000110 %A	
+
 INS ADD_A-,-@A<g3>                      10000@A
     INS ADD_-@A<g3>-,-A                 10000@A
     INS ADD_@A<g3>                      10000@A
 INS ADD_A-,-%A<8>                       11000110 %A
 INS ADD_A-,-[-@A<g8>-+-%B<8>-]          @A 10000110 %B
-    INS ADD_A-,-[-%B<8>-+-@A<g8>-]      @A 10000110 %B
+
+    # Cesc: ADD A,[IX+n]:
+    #INS ADD_A-,-[-%B<8>-+-@A<g8>-]      @A 10000110 %B
+
     INS ADD_A-,-[-@A<g8>-]              @A 10000110 00000000
     INS ADD_-[-@A<g8>-+-%B<8>-]          @A 10000110 %B
     INS ADD_-[-%B<8>-+-@A<g8>-]      @A 10000110 %B

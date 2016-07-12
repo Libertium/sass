@@ -886,9 +886,15 @@ namespace sass
 						EnableVerbose = true;
 						break;
 					}
+					case "bios":
                     case "include":
                     {
-                        string file = GetIncludeFile(parameter);
+						
+						if(directive =="bios")
+							parameter ="\".\\libs\\bios.asm\"";
+						
+						string file = GetIncludeFile(parameter);
+						
                         if (file == null)
                         {
                             listing.Error = AssemblyError.FileNotFound;

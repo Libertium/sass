@@ -27,54 +27,6 @@
 
 initmain:
 
-; 	add a,[ix+33]
-/*ADD A,A      ADD A,(HL)        ADD HL,BC      ADD IY,BC
-ADD A,B      ADD A,(IX+d)      ADD HL,DE      ADD IY,DE
-ADD A,C      ADD A,(IY+d)      ADD HL,HL      ADD IY,IY
-ADD A,D                        ADD HL,SP      ADD IY,SP
-ADD A,E                        ADD IX,BC
-ADD A,H                        ADD IX,DE
-ADD A,L                        ADD IX,IX
-ADD A,n                        ADD IX,SP*/
-
-ADD A,A      
-ADD A,B      
-ADD A,C      
-ADD A,D      
-ADD A,E      
-ADD A,H      
-ADD A,L      
-ADD A,100      
-
-ADD A,[HL]
-ADD A,[IX+10]
-ADD A,[IY+20]
-
-ADD HL,BC     
-ADD HL,DE     
-ADD HL,HL     
-
-ADD IY,BC
-ADD IY,DE
-ADD IY,IY
-
-ADD HL,SP      
-ADD IY,SP
-
-ADD IX,BC
-ADD IX,DE
-ADD IX,IX
-ADD IX,SP
-
- 	
- 	LD A,[BC]       
-	LD A,[DE]       
-	LD A,[HL]       
-	LD A,[IX+10]     
-	LD A,[IY+10]     
-	LD A,[$4000]
-
-/*
 	ei
 	halt
 	di
@@ -175,4 +127,3 @@ demo_song:
 
 	.INCLUDE	".\tests\trilo\ttreplayRAM.asm"
 pattern:	.ds 1
-*/
