@@ -1,5 +1,5 @@
 ﻿
-TODO: actualitzat el 11-7-2016
+TODO: actualitzat el 14-7-2016
 =====
 
 (Ok) Resoldre problema de linia amb comentari que dona error al ensamblar
@@ -24,6 +24,11 @@ TODO: actualitzat el 11-7-2016
 (Cesc) Implementar la directiva .rom: els .org al rang 0x4000-0xBFFF fan que les dades al binari de sortida es generin en trams de 8Kb
 (Cesc) Revisar els ORG que no funcionen com es d'esperar
 (Cesc) Incorporar les directives subpage per poder generar megaroms:
+	() Controlar situacions:
+		() Error: megaROM subpage overflow: ds (1024*8)+1
+		() Warning: 12 out of 15 megaROM pages are not defined: .subpage 2 at $8000	, .subpage 15 at $A000, .subpage 1 at $6000	
+		() .subpage 0 at $4000 es implicit
+
 
 	megarom_bank0	.equ		04000h
 	megarom_bank1	.equ		06000h

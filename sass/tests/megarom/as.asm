@@ -18,7 +18,7 @@ megarom_bank3	.equ		0A000h
 							;Así, .PAGE 0 equivale a .ORG 0000h,y .PAGE 1 equivale a .ORG 4000h, 
 							;.PAGE 2 equivale a .ORG 8000h y .PAGE 3 equivale a .ORG 0C000h
 
-		;.megarom KonamiSCC	;[mapeador] Define la cabecera y estructura para producir una megaROM. 
+		.megarom KonamiSCC	;[mapeador] Define la cabecera y estructura para producir una megaROM. 
 							;Por defecto se define también la subpágina 0 del mapeador, por
 							;lo que no es necesario incluir ninguna instrucción ORG ni PAGE o SUBPAGE previa. 
 							;Los tipos de mapeador soportado son los siguientes: 
@@ -26,16 +26,16 @@ megarom_bank3	.equ		0A000h
 							; KonamiSCC: subpágina de 8 KB, límite de 64 páginas. Limite de 512 KB (4 megabits). Soporta acceso a SCC.
 							; ASCII8: tamaño de subpágina de 8 KB, límite de 256 pag. Maximo megaROM de 2048 KB (16 megabits, 2 megabytes).
 							; ASCII16: subpágina de 16 KB, límite de 256 paginas. El tamaño máximo del megaROM sera 4096 KB (32 megabits).
-		;.start init
-		;db "MegaROM",1ah
+		.start init
+		db "MegaROM",1ah
 
-        org 04000h
+        /*org 04000h
         db "AB"             ; ID bytes
         dw init            	; cartridge initialization
         dw 0                ; statement handler (not used)
         dw 0                ; device handler (not used)
         dw 0                ; BASIC program in ROM (not used, especially not in page 1)
-        dw 0,0,0            ; reserved
+        dw 0,0,0            ; reserved*/
 
 main:
         ld a,1
@@ -80,7 +80,7 @@ init:   call RSLREG			;bios.RSLREG
 ; Assembler's program counter should be 6000h at this point
 ; (check "block1" label in assembler list output to see if that's the case)
 
-		;.subpage 1 at $6000	
+		.subpage 1 at $6000	
 block1:
 screen2:
         ld hl,0f3e9h                                   ; Color 15,0,0
@@ -101,17 +101,24 @@ screen2:
 
 
 
-/*
-block2:
-		.page 2					; equivale a .ORG 8000h 
-		.subpage 2 at $8000	
-		ld	a,0
-		ret
 
-		.subpage 3 at $A000	
+block2:
+		;.page 2					; equivale a .ORG 8000h 
+		.subpage 2 at $8000	
+		ld	hl,data1
+		ds	1024*8
 		ld	a,0
 		ret
-*/
+data1:
+		db 0
+
+		.subpage 15 at $A000	
+		ld	hl,data2
+		ld	a,0
+		ret
+data2:
+		db 0
+
 
 /*
 You seem to rely on assembler directives to produce the code. Maybe that's easier, but you don't need it,

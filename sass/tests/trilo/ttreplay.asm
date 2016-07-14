@@ -1626,9 +1626,9 @@ _noVolume:
 	ld	a,[hl]	; get	the deviation	
 	inc	hl
 	bit	6,e
-	jp	z,.skip
+	jp	z,@@skip
 	add	[ix+TRACK_Noise]
-.skip:	
+@@skip:	
 	ld	[ix+TRACK_Noise],a
 	ld	[AY_regNOISE],a
 	

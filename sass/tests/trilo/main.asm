@@ -1,19 +1,13 @@
+	;.verbose
+
 ; -----------------------------
 ; TT-replayer example
 ; 
 ; This example plays compiled PSG+SCC songs
 ; ------------------------------
-;;	.bios
-	.page 1
-	.rom 
-	.start	initmain
-	.dw	0,0,0,0,0,0	
-
-	;.verbose
-
 /*
-	.rom 
-;	.page 1
+	;.rom 
+	;.page 1
 	;db "MegaROM",1ah
     .org 04000h
     .db "AB"             ; ID bytes
@@ -24,6 +18,13 @@
     .dw 0,0,0            ; reserved
  	.dw	0,0,0,0,0,0	
 */
+
+;	.bios
+	.page 1
+	.rom 
+	.start	initmain
+	;.dw	0,0,0,0,0,0	
+	.ds	12
 
 initmain:
 
@@ -61,6 +62,20 @@ initmain:
 
 	ld	[hl],0
 	ldir	
+
+megarom_bank0	.equ		04000h
+megarom_bank1	.equ		06000h
+megarom_bank2	.equ		08000h
+megarom_bank3	.equ		0A000h
+
+	ld	a,0
+	ld [megarom_bank0],a
+	inc a
+	ld [megarom_bank1],a
+	inc a
+	ld [megarom_bank2],a
+	inc a
+	ld [megarom_bank3],a
 
 	;--- place replayer on hook
 	ld	a,0xc3
@@ -118,6 +133,7 @@ isr:
 
 ; Cesc test per fer que generi un rom de 32KB	
 ;	.PAGE 2
+	.org 0x6000
 demo_song:
 	.INCLUDE	".\tests\trilo\demosong.asm"
 

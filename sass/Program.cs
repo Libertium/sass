@@ -184,10 +184,58 @@ namespace sass
 			
 				settings.Verbose = settings.Verbose | assembler.EnableVerbose;
 
-				if (outputFile == "-")
-					Console.OpenStandardOutput ().Write (output.Data, 0, output.Data.Length);
+				if (assembler.IsROM) {
+					// Sizes: 16KB to 48KB in steps of 8KB
+					int pages =1;
+					int size = pages * 16 * 1024;	// Default 128KB
+
+					/*	.db "AB"             ; ID bytes
+						.dw initmain       	 ; cartridge initialization
+						.dw 0                ; statement handler (not used)
+						.dw 0                ; device handler (not used)
+						.dw 0                ; BASIC program in ROM (not used, especially not in page 1)
+						.dw 0,0,0            ; reserved
+						.dw	0,0,0,0,0,0	*/
+					byte[] rom = new byte[size]; //{ (byte)'A', (byte)'B' };
+					rom [0] = (byte)'A';
+					rom [1] = (byte)'B';
+					var romStart = BitConverter.GetBytes (assembler.ROMStart);
+					rom [2] = romStart.Take (2).ToArray () [0];
+					rom [3] = romStart.Take (2).ToArray () [1];
+					for (int i = 4; i < 16; i++)
+						rom [i] = 0;
+
+					int srcAdress = 0;
+					foreach (Assembler.ORGItem item in assembler.ORGsList) {
+						Console.WriteLine ("ORG: 0x{0:X}-0x{1:X} Subpage:{2}", item.ORGAdress, item.ORGLength, item.Subpage);	
+						uint orgIni;
+						if (srcAdress == 0)
+							orgIni = item.ORGAdress - 0x4000 + 16;
+						else
+							orgIni = item.ORGAdress - 0x4000;
+							
+						if (item.ORGAdress < 0xc000) {
+							for (uint i = orgIni; i < (item.ORGLength - 0x4000); i++) {
+								rom [i] = output.Data [srcAdress];
+								srcAdress++;
+							}
+						}
+					}
+					File.WriteAllBytes (outputFile.Replace (".bin", ".rom"), rom);
+				} 
+				/// Cesc: TODO !!!
+				else if (assembler.IsMegaROM) {
+				
+
+				}
 				else
-					File.WriteAllBytes (outputFile, output.Data);
+				{
+					if (outputFile == "-")
+						Console.OpenStandardOutput ().Write (output.Data, 0, output.Data.Length);
+					else
+						File.WriteAllBytes (outputFile, output.Data);
+				}
+
 				var errors = from l in output.Listing
 				             where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
 				             orderby l.RootLineNumber

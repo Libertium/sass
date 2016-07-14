@@ -48,7 +48,10 @@ namespace sass
 		public bool ASMSX { get; set; }
 		public bool IsROM = false;
 		public bool IsMegaROM = false;
+		public int MegaROMPageSize;
 		public List<ORGItem> ORGsList { get; set; }
+		public uint ROMStart;
+		string ROMStartLabel ="";
 
 		public struct ORGItem
 		{
@@ -453,6 +456,9 @@ namespace sass
             }
 			addToORGList(PC, 0,0);
 			ORGsList.Remove (ORGsList.Last ());
+			if (ROMStartLabel != "") {
+				ROMStart = (uint)ExpressionEngine.Evaluate(ROMStartLabel, PC, RootLineNumber);							
+			}
             return Finish(Output);
         }
 
@@ -490,10 +496,10 @@ namespace sass
         {
             var finalBinary = new List<byte>();
             ExpressionEngine.LastGlobalLabel = null;
-			foreach(ORGItem item in ORGsList)
+			/*foreach(ORGItem item in ORGsList)
 			{
 				Console.WriteLine ("ORG: 0x{0:X}-0x{1:X}", item.ORGAdress, item.ORGLength);				
-			}
+			}*/
 
             for (int i = 0; i < output.Listing.Count; i++)
             {
@@ -697,10 +703,28 @@ namespace sass
 							// ASCII8: tamaño de subpágina de 8 KB, límite de 256 pag. Maximo megaROM de 2048 KB (16 megabits, 2 megabytes).
 							// ASCII16: subpágina de 16 KB, límite de 256 paginas. El tamaño máximo del megaROM sera 4096 KB (32 megabits).
 							IsMegaROM = true;
+
+							if(parameter.Trim().ToLower() == "konamiscc" || 
+								parameter.Trim().ToLower() == "konamiscc" || 
+								parameter.Trim().ToLower() == "ascii8")
+							{
+								MegaROMPageSize =8;	
+							}
 							return listing;
 						}
 					}
-                    case "block":
+					case "start":
+					{
+						if (parameters.Length != 0){
+							ROMStartLabel = parameter;
+							PC +=16;
+						}
+						else{
+							listing.Error = AssemblyError.InvalidDirective;
+						}
+						return listing;
+					}
+					case "block":
                     {
                         ulong amount = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
                         listing.Output = new byte[amount];
@@ -881,6 +905,46 @@ namespace sass
 						addToORGList(currentPC, PC,0);
                         return listing;
 					}
+
+					/// Cesc TODO !!!
+					case "subpage":
+					{
+						/*
+						if (parameters.Length != 0){
+							ROMStartLabel = parameter;
+							PC +=16;
+						}
+						else{
+							listing.Error = AssemblyError.InvalidDirective;
+						}
+						return listing;
+						*/
+
+						/*uint currentPC = PC;
+						ulong page = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						switch (page)
+						{
+						case 0:
+							PC = 0;
+							break;
+						case 1:
+							PC = 0x4000;
+							break;
+						case 2:
+							PC = 0x8000;
+							break;
+						case 3:
+							PC = 0xc000;
+							break;
+						}
+						// Cesc TODO el org no es comporta com esperem !!!
+						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+							PC, parameter, RootLineNumber, currentPC);
+						addToORGList(currentPC, PC,0);
+						*/
+						return listing;
+					}
+
 					case "verbose":
 					{
 						EnableVerbose = true;
