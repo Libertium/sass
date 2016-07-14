@@ -24,7 +24,7 @@
 	.rom 
 	.start	initmain
 	;.dw	0,0,0,0,0,0	
-	.ds	12
+	;.ds	12
 
 initmain:
 
@@ -63,16 +63,16 @@ initmain:
 	ld	[hl],0
 	ldir	
 
-megarom_bank0	.equ		04000h
-megarom_bank1	.equ		06000h
-megarom_bank2	.equ		08000h
-megarom_bank3	.equ		0A000h
+megarom_bank0	.equ		05000h
+megarom_bank1	.equ		07000h
+megarom_bank2	.equ		09000h
+megarom_bank3	.equ		0B000h
 
 	ld	a,0
 	ld [megarom_bank0],a
 	inc a
 	ld [megarom_bank1],a
-	inc a
+	ld	a,0x5f
 	ld [megarom_bank2],a
 	inc a
 	ld [megarom_bank3],a
@@ -135,7 +135,7 @@ isr:
 ;	.PAGE 2
 	.org 0x6000
 demo_song:
-	.INCLUDE	".\tests\trilo\demosong.asm"
+	.INCLUDE	".\tests\trilo\demosong2.asm"
 
 ;;	map	0xc000
 ;	.org 0xc000 ; Cesc test
