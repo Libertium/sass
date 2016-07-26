@@ -32,15 +32,9 @@ namespace sass
         private string CurrentLine { get; set; }
         private bool Listing { get; set; }
 
+
 		public bool EnableVerbose { get; set; }
-
 		private string moduleNamespace = "";
-
-		/// <summary>
-		/// Cesc: Only for testing purposes <see cref="sass.Assembler"/> cesc verbose.
-		/// </summary>
-		/// <value><c>true</c> if cesc verbose; otherwise, <c>false</c>.</value>
-		public bool CescVerbose { get; set; }
 		/// <summary>
 		/// Cesc: Gets or sets a value indicating whether this <see cref="sass.Assembler"/> is ASMS.
 		/// </summary>
@@ -52,6 +46,11 @@ namespace sass
 		public List<ORGItem> ORGsList { get; set; }
 		public uint ROMStart;
 		string ROMStartLabel ="";
+		uint currentSubpageORG;
+		uint PCRepeat { get; set; }
+		ulong repeatAmount;
+		uint phasePC { get; set; }
+		uint dephasePC { get; set; }
 
 		public struct ORGItem
 		{
@@ -427,11 +426,6 @@ namespace sass
 					if (string.IsNullOrEmpty (CurrentLine) || !Listing) {
 						continue;
 					} else {
-
-						/// Cesc verbose
-						if(CescVerbose)
-							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
-
 						// Check instructions
 						var match = InstructionSet.Match (CurrentLine);
 						if (match == null)
@@ -496,16 +490,10 @@ namespace sass
         {
             var finalBinary = new List<byte>();
             ExpressionEngine.LastGlobalLabel = null;
-			/*foreach(ORGItem item in ORGsList)
-			{
-				Console.WriteLine ("ORG: 0x{0:X}-0x{1:X}", item.ORGAdress, item.ORGLength);				
-			}*/
 
             for (int i = 0; i < output.Listing.Count; i++)
             {
                 var entry = output.Listing[i];
-				/// Cesc
-				//Console.WriteLine(">> {0} {1} {2} \t\t {3}", entry.FileName, entry.LineNumber, entry.Code, entry.Instruction, entry.Output);
                 RootLineNumber = entry.RootLineNumber;
                 PC = entry.Address;
                 LineNumbers = new Stack<int>(new[] { entry.LineNumber });
@@ -513,8 +501,6 @@ namespace sass
                 {
 					// PassTwo
 					if (entry.PostponeEvalulation) {
-						/// Cesc
-						//Console.WriteLine ("Pass Two: " + entry.Code);
 						output.Listing [i] = HandleDirective (entry.Code, true);
 					}
 
@@ -630,11 +616,10 @@ namespace sass
 
 		private void addToORGList(uint currentPC, uint PC, uint subpage)
 		{
-			//ORGsList.Add(new ORGItem(paramter, currentPC));
 			if (ORGsList.Count > 0) {
 				ORGItem last = ORGsList.Last ();
 				ORGsList.Remove (last);
-				ORGsList.Add (new ORGItem (last.ORGAdress, currentPC, subpage));
+				ORGsList.Add (new ORGItem (last.ORGAdress, currentPC, last.Subpage));
 				ORGsList.Add (new ORGItem (PC, PC, subpage));
 			} else { 
 				ORGsList.Add (new ORGItem (PC, currentPC, subpage));
@@ -645,9 +630,6 @@ namespace sass
 
         private Listing HandleDirective(string line, bool passTwo = false)
         {
-			// Cesc debug directives
-			//Console.WriteLine (line);
-
             string directive = line.Substring(1).Trim();
             string[] parameters = new string[0];
             string parameter = "";
@@ -670,8 +652,6 @@ namespace sass
                 RootLineNumber = RootLineNumber
             };
 
-			// Cesc
-			// if (passTwo) Console.WriteLine ("Pass Two");
             try
             {
                 switch (directive)
@@ -686,6 +666,10 @@ namespace sass
 						else
 						{
 							IsROM = true;
+							addToORGList(PC, 0x4000,0);
+							PC =0x4000;
+							currentSubpageORG = PC;
+
 							return listing;
 						}
 					}
@@ -710,6 +694,10 @@ namespace sass
 							{
 								MegaROMPageSize =8;	
 							}
+							addToORGList(PC, 0x4000,0);
+							PC =0x4000;
+							currentSubpageORG = PC;
+
 							return listing;
 						}
 					}
@@ -747,7 +735,7 @@ namespace sass
                                 {
                                     try
                                     {
-                                        result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));
+										result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));										
                                     }
                                     catch (KeyNotFoundException)
                                     {
@@ -764,8 +752,9 @@ namespace sass
                             int length = 0;
                             foreach (var p in parameters)
                             {
-                                if (p.StartsWith("\"") && p.EndsWith("\""))
-                                    length += p.Substring(1, p.Length - 2).Unescape().Length;
+								var para = p.Trim();
+								if (para.StartsWith("\"") && para.EndsWith("\""))
+									length += para.Substring(1, para.Length - 2).Unescape().Length;
                                 else
                                     length++;
                             }
@@ -799,8 +788,9 @@ namespace sass
                         }
                     }
                     case "error":
-                    case "echo":
-					case "print":
+                    case "echo":		// Cesc TODO: cal formatar en cada cas
+					case "print":		// Cesc TODO: cal formatar en cada cas
+					case "printdec":	// Cesc TODO: cal formatar en cada cas
 					case "printtext":
                     {
                         if (passTwo)
@@ -844,6 +834,7 @@ namespace sass
 					}
 					/// Cesc
 					case "ds":
+					// TODO: cal contemplar el subpage overflow
 					case "fill":
                     {
                         parameters = parameter.SafeSplit(',');
@@ -870,14 +861,29 @@ namespace sass
                     }
                     case "org":
 					{
-						uint currentPC = PC;
-                        PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						if(IsMegaROM)
+						{
+							uint now = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
 
-						// Cesc TODO el org no es comporta com esperem !!!
-						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
-							PC, parameter, RootLineNumber,currentPC);
-						addToORGList(currentPC, PC,0);
-						
+							if ( now >= 0xc000 || now  < currentSubpageORG +0x2000)
+							{
+								uint currentPC = PC;
+								PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+								addToORGList(currentPC, PC,0);
+							}
+							else
+							{
+								uint currentPC = PC;
+								PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+								listing.Error = AssemblyError.MegaROMSubpageOverflow;  
+							}
+						}
+						else
+						{
+							uint currentPC = PC;
+	                        PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+							addToORGList(currentPC, PC,0);
+						}
                         return listing;
 					}
                     case "page":
@@ -899,49 +905,21 @@ namespace sass
                                 PC = 0xc000;
                                 break;
                         }
-						// Cesc TODO el org no es comporta com esperem !!!
-						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
-							PC, parameter, RootLineNumber, currentPC);
 						addToORGList(currentPC, PC,0);
                         return listing;
 					}
-
-					/// Cesc TODO !!!
 					case "subpage":
 					{
-						/*
-						if (parameters.Length != 0){
-							ROMStartLabel = parameter;
-							PC +=16;
+						if (parameters.Length != 4){
+							uint currentPC = PC;
+							PC = (uint)ExpressionEngine.Evaluate(parameters[2], PC, RootLineNumber);
+							currentSubpageORG = PC;
+							uint subpage = (uint)ExpressionEngine.Evaluate(parameters[0], PC, RootLineNumber);
+							addToORGList(currentPC, PC, subpage);
 						}
 						else{
 							listing.Error = AssemblyError.InvalidDirective;
 						}
-						return listing;
-						*/
-
-						/*uint currentPC = PC;
-						ulong page = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
-						switch (page)
-						{
-						case 0:
-							PC = 0;
-							break;
-						case 1:
-							PC = 0x4000;
-							break;
-						case 2:
-							PC = 0x8000;
-							break;
-						case 3:
-							PC = 0xc000;
-							break;
-						}
-						// Cesc TODO el org no es comporta com esperem !!!
-						Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
-							PC, parameter, RootLineNumber, currentPC);
-						addToORGList(currentPC, PC,0);
-						*/
 						return listing;
 					}
 
@@ -953,7 +931,6 @@ namespace sass
 					case "bios":
                     case "include":
                     {
-						
 						if(directive =="bios")
 							parameter ="\".\\libs\\bios.asm\"";
 						
@@ -968,8 +945,9 @@ namespace sass
                         LineNumbers.Push(0);
                         string includedFile = File.ReadAllText(file) + "\n.endfile";
 
-						// Cesc Eliminar els comentaris del tipus /* */ o //
 						Console.WriteLine("Include: "+file);
+
+						// Cesc Eliminar els comentaris del tipus /* */ o //
 						if (ASMSX){
 							var blockComments = @"/\*(.*?)\*/";
 							var lineComments = @"//(.*?)\r?\n";
@@ -1000,11 +978,6 @@ namespace sass
 					/// Cesc
 					case "incbin":
 					{
-						if(CescVerbose)
-						{
-							//Console.WriteLine("incbin paramenters {0} parameter {1}",parameters, parameter);
-							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
-						}
 						parameters = parameters.Where(w => w != "").ToArray(); 
 
 						string file ="";
@@ -1044,20 +1017,23 @@ namespace sass
 								}
 								amountSkip = (long)ExpressionEngine.Evaluate(skipValue, PC, RootLineNumber);
 								amountSize = (long)ExpressionEngine.Evaluate(sizeValue, PC, RootLineNumber);
-								// Console.WriteLine("skip {0} size {1}",skipValue, sizeValue);
-								// Console.WriteLine("skip {0} size {1}",amountSkip, amountSize);
 							}
 							if(file != "")
 							{
+								/// per fer tambe la cerca al directori especificat amb --include
+								file = GetIncludeFile("<"+ file +">");
+
 								if (File.Exists(file))
 								{
+									
 									var fs = new FileStream(file, FileMode.Open);
 									try{
 										if (amountSkip + amountSize > fs.Length)
 											throw new Exception("Lectura fora del fitxer.");
 
+										long fsLength = fs.Length;
 										if (amountSize == 0) 
-											amountSize = fs.Length;
+											amountSize = fsLength;
 										if(amountSkip >0)
 											fs.Seek(amountSkip, SeekOrigin.Begin);
 							
@@ -1065,25 +1041,24 @@ namespace sass
 										fs.Read(fileBytes, 0, (int)amountSize);
 										fs.Close();
 
-										if(CescVerbose)
-											Console.WriteLine("Readed {0} bytes",fileBytes.Length);
-										
+										if (amountSkip == 0 && amountSize == fsLength) 
+											Console.WriteLine("Including binary file {0}",file);
+										else
+											Console.WriteLine("Including binary file {0} skipping {1} bytes, saving {2} bytes",
+												file, amountSkip,amountSize);
+
 										listing.Output = fileBytes; 
 										PC += (uint)fileBytes.Length;
 										return listing;
 									}catch(Exception ex)
-									{
-										if(CescVerbose)
-											Console.WriteLine("Error {0}", ex.Message);	
-										
+									{										
 										/// TODO: cal un error adequat
 										listing.Error = AssemblyError.FileNotFound;
 										fs.Close();
 									}
 								}
 								else{
-									
-									//Console.WriteLine("File {0} not found.",file);
+									Console.WriteLine("File {0} not found.",file);
 									listing.Error = AssemblyError.FileNotFound;
 								}
 							}
@@ -1112,6 +1087,86 @@ namespace sass
 						}
 						break;
 					}
+
+					case "phase":
+					{
+						phasePC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						if (phasePC == 0)
+						{
+							Console.WriteLine("ignore PHASE {0} = {1} do in pass two.", parameter, phasePC);
+							listing.PostponeEvalulation = true;
+						}
+						else
+						{
+							dephasePC = PC;
+							PC = phasePC;
+							Console.WriteLine("PHASE 0x{0:X} (PC: 0x{1:X})", phasePC, dephasePC);
+						}
+						return listing;
+					}
+					case "dephase":
+					{
+						if (phasePC != 0){
+							uint delta =0;
+
+							// Cesc: TODO aixo es extrany, funciona pero cal veure quin es el problema
+							if(!passTwo)
+								delta = PC - phasePC;
+							else
+								delta = PC - dephasePC;
+							
+							Console.WriteLine("DEPHASE 0x{0:X} delta: 0x{1:X} (PC: 0x{2:X})", PC, delta, dephasePC + delta);
+							PC = dephasePC + delta;
+							phasePC =0;
+							dephasePC =0;
+						}
+						else
+						{
+							listing.PostponeEvalulation = true;
+						}
+						return listing;
+					}
+					case "rept":
+					{
+						if (!passTwo) 
+						{
+							PCRepeat = PC;
+							repeatAmount = ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+
+							// Cesc TODO: aixo ens caldra per fer la segona passada
+							//listing.PostponeEvalulation = true;
+							return listing;
+						}
+						else{
+							Console.WriteLine ("Pass Two .rept");
+							break;
+						}
+					}
+					// cesc TODO
+					case "endr":
+					{
+						if (passTwo) 
+							Console.WriteLine ("Pass Two .endr");
+						
+						if (repeatAmount != 0){
+							ulong blockSize = PC - PCRepeat;
+							ulong amount = repeatAmount * (blockSize-1);
+
+							var test = Output.Listing.Last().Instruction.Value;
+
+							listing.Output = new byte[amount];
+
+							PC += (uint)amount;
+							PCRepeat =0;
+							repeatAmount =0;
+							//listing.PostponeEvalulation = true;
+							return listing;
+						}
+						else{
+							Console.WriteLine("Error .endr: missing .rept");
+						}
+						break;
+					}
                     case "equ":
 					{
                         if (parameters.Length == 1)
@@ -1135,11 +1190,6 @@ namespace sass
 							string label = parameters[0].ToLower();
 							if (moduleNamespace != "")
 								label = moduleNamespace +"."+label;
-
-							/*foreach (var item in parameters)
-								result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
-							listing.Output = result.ToArray();
-							return listing;*/
 
 
                             ExpressionEngine.Symbols.Add(label, new Symbol(
@@ -1436,7 +1486,10 @@ namespace sass
                         }
                         return listing;
 					}
-                }
+					default:
+					Console.WriteLine("Invalid directive .{0}  {1:D6} {2}", directive, RootLineNumber, CurrentLine);
+						break;
+				}
             }
             catch (KeyNotFoundException)
             {
@@ -1450,7 +1503,7 @@ namespace sass
             }
 			// Cesc
 			catch(Exception ex) {
-				Console.WriteLine ("Cesc Exception: {0}", ex.Message);
+				Console.WriteLine ("Warn: {0}", ex.Message);
 			}
             return null;
         }

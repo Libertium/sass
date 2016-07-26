@@ -15,7 +15,7 @@ TODO: actualitzat el 14-7-2016
 (Ok) Als include no fa @@label: sigui sinonim de .label: amb el modificador --asmsx
 (Ok) Als .fill o .ds detectar i limitar el tamany a un maxim de 0xFFFF
 () Als .block detectar i limitar el tamany a un maxim de 0xFFFF
-() Problema al avaluar les expresions negatives:
+(Ok) Problema al avaluar les expresions negatives:
 	TRACK_Instrument_CESC		.equ 0-17
 	ld hl,TRACK_Instrument_CESC	--> Error: ValueTruncated
 (Validar) Validar el calcul de expressions per exemple .equ value 0x1234 - 28
@@ -27,7 +27,34 @@ TODO: actualitzat el 14-7-2016
 	() Controlar situacions:
 		() Error: megaROM subpage overflow: ds (1024*8)+1
 		() Warning: 12 out of 15 megaROM pages are not defined: .subpage 2 at $8000	, .subpage 15 at $A000, .subpage 1 at $6000	
-		() .subpage 0 at $4000 es implicit
+		(Ok) .subpage 0 at $4000 es implicit
+() Controlar millor el MegaROMSubpageOverflow, ara nomes es controla amb els .ORG
+() Treure les expressions regulars per /* */ i fer-ho al fer la lectura, per tenir el nombres de linies correctes.
+() El .phase .dephase no funciona del tot correctament, segurament a les referencies absolutes dins del propi bloc.
+() El .rept no funciona correctament, falta omplir els bytes del bloc que de moment queda amb 00's
+() Treure el --cv CescVerbose i fer que el --verbose pugui tenir n graus de detall
+() Treure els Console.WriteLine i implementar-ho amb els entry.Warning i entry.Error o d'alguna forma semblant.
+() Un cop implementat tot, encapsular en un tipus Parametres totes les propietats de la classe Assembler:
+		public bool CescVerbose { get; set; }
+		public bool ASMSX { get; set; }
+		public bool IsROM = false;
+		public bool IsMegaROM = false;
+		public int MegaROMPageSize;
+		public List<ORGItem> ORGsList { get; set; }
+		public uint ROMStart;
+		string ROMStartLabel ="";
+		uint currentSubpageORG;
+		uint PCRepeat { get; set; }
+		ulong repeatAmount;
+		uint phasePC { get; set; }
+		uint dephasePC { get; set; }
+() Implementar correctament:
+	case "echo":		// Cesc TODO: cal formatar en cada cas
+	case "print":		// Cesc TODO: cal formatar en cada cas
+	case "printdec":	// Cesc TODO: cal formatar en cada cas
+	case "printtext":
+
+
 
 
 	megarom_bank0	.equ		04000h
@@ -84,3 +111,8 @@ TODO: actualitzat el 14-7-2016
 
 	.SIZE X 
 		Establece el tamaño del archivo resultante en Kilobytes.
+
+
+
+; Error al asMSX: subpage 0 can only be defined by megaROM directive
+;.SUBPAGE 0 AT $4000	; Cesc aixo no cal, es implicit

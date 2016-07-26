@@ -6,12 +6,12 @@ using System.IO;
 using System.Reflection;
 using System.Diagnostics;
 using System.Threading;
+using System.Globalization;
 
 namespace sass
 {
     public class Program
     {
-		static bool cescVerbose = false;
 		static bool asmsx = false;
 
         public static Dictionary<string, InstructionSet> InstructionSets;
@@ -25,6 +25,15 @@ namespace sass
             string inputFile = null, outputFile = null;
             var settings = new AssemblySettings();
             List<string> defines = new List<string>();
+
+			Console.WriteLine ("-------------------------------------------------------------------------------");
+			Console.WriteLine ("sassMSX v.0.1 WIP cross-assembler. KnightOS [2015], Libertium Games[2016/07/26]");
+			Console.WriteLine ("-------------------------------------------------------------------------------");
+			// Assembling labels, calls and jumps
+			// Output text file game.txt saved
+			// Binary file game.rom saved
+			// Symbol file game.sym saved
+			// Completed in 1.07 seconds
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -79,10 +88,6 @@ namespace sass
 								asmsx = true;
 								break;
 						
-							case "--cv":
-								cescVerbose = true;
-							break;
-
                             case "-l":
                             case "--listing":
 								if( !args[i+1].StartsWith("-"))
@@ -137,6 +142,7 @@ namespace sass
 
             if (inputFile == null)
             {
+				Console.Error.WriteLine ("Syntax: sassMSX [file.asm]");
                 Console.Error.WriteLine("No input file specified. Use sass.exe --help for usage information.");
                 return 1;
             }
@@ -159,7 +165,6 @@ namespace sass
 
             var assembler = new Assembler(selectedInstructionSet, settings);
 
-			assembler.CescVerbose = cescVerbose;
 			assembler.ASMSX = asmsx;
 
             foreach (var define in defines)
@@ -177,37 +182,46 @@ namespace sass
             var watch = new Stopwatch();
             
 			AssemblyOutput output = null;
+
 			if (file != "") {
 				watch.Start ();
 				output = assembler.Assemble (file, inputFile);
-				watch.Stop ();
 			
 				settings.Verbose = settings.Verbose | assembler.EnableVerbose;
 
+				var errors = from l in output.Listing
+						where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
+					orderby l.RootLineNumber
+					select l;
+				if (!settings.Verbose) {
+					foreach (var listing in errors) {
+						if (listing.Error != AssemblyError.None)
+							Console.Error.WriteLine (listing.FileName + " " + listing.Error + " " + listing.LineNumber + " " + listing.Code);
+					}
+				}
+
+				if (settings.Verbose || settings.ListingOutput != null) {
+					var listing = GenerateListing (output);
+					if (settings.Verbose)
+						Console.Write (listing);
+					if (settings.ListingOutput != null)
+					{
+						File.WriteAllText (settings.ListingOutput, listing);
+						Console.WriteLine ("Output text file " + settings.ListingOutput + " saved");
+					}
+				}
+
+
+				// Cesc: todo pendent de validar amb casos de prova i en especial les ROM de 48KB
 				if (assembler.IsROM) {
-					// Sizes: 16KB to 48KB in steps of 8KB
-					int pages =1;
-					int size = pages * 16 * 1024;	// Default 128KB
-
-					/*	.db "AB"             ; ID bytes
-						.dw initmain       	 ; cartridge initialization
-						.dw 0                ; statement handler (not used)
-						.dw 0                ; device handler (not used)
-						.dw 0                ; BASIC program in ROM (not used, especially not in page 1)
-						.dw 0,0,0            ; reserved
-						.dw	0,0,0,0,0,0	*/
-					byte[] rom = new byte[size]; //{ (byte)'A', (byte)'B' };
-					rom [0] = (byte)'A';
-					rom [1] = (byte)'B';
-					var romStart = BitConverter.GetBytes (assembler.ROMStart);
-					rom [2] = romStart.Take (2).ToArray () [0];
-					rom [3] = romStart.Take (2).ToArray () [1];
-					for (int i = 4; i < 16; i++)
-						rom [i] = 0;
-
+					
+					// Sizes: 16KB to 48KB in steps of 16KB
+					int pages = 2;	// TODO Default 32KB
+					int size = pages * 16 * 1024;	
+					byte[] rom = setROMHeader (size, assembler.ROMStart);
+				
 					int srcAdress = 0;
 					foreach (Assembler.ORGItem item in assembler.ORGsList) {
-						Console.WriteLine ("ORG: 0x{0:X}-0x{1:X} Subpage:{2}", item.ORGAdress, item.ORGLength, item.Subpage);	
 						uint orgIni;
 						if (srcAdress == 0)
 							orgIni = item.ORGAdress - 0x4000 + 16;
@@ -223,10 +237,57 @@ namespace sass
 					}
 					File.WriteAllBytes (outputFile.Replace (".bin", ".rom"), rom);
 				} 
-				/// Cesc: TODO !!!
-				else if (assembler.IsMegaROM) {
-				
+				else if (assembler.IsMegaROM) 
+				{
+					// Sizes: 128KB to 512KB in steps of 8KB
+					int pages =0;	
 
+					foreach (Assembler.ORGItem item in assembler.ORGsList) {
+						pages = (int)Math.Max (pages, item.Subpage);
+
+					}
+					pages++;
+					int size = pages * 8 * 1024;	
+					byte[] rom = setROMHeader (size, assembler.ROMStart);
+
+					int srcAdress = 0;
+					uint subpage =0;
+					uint SubpageORG =0;
+
+					foreach (Assembler.ORGItem item in assembler.ORGsList) {
+						uint orgIni;
+						if (item.Subpage != subpage) {
+							subpage = item.Subpage;
+							SubpageORG = item.ORGAdress;
+						}
+
+						if (srcAdress == 0)
+						{
+							orgIni = 16;
+							subpage = item.Subpage;
+							SubpageORG = item.ORGAdress;
+						}
+						else
+							orgIni = (item.ORGAdress - SubpageORG) + item.Subpage *0x2000;
+
+						if (item.ORGAdress < 0xc000) {
+							uint len = (item.ORGAdress - SubpageORG) + item.Subpage *0x2000 + (item.ORGLength - item.ORGAdress);
+							for (uint i = orgIni; i < len; i++) {
+								rom [i] = output.Data [srcAdress];
+								srcAdress++;
+							}
+						}
+					}
+
+					if (errors.Count (e => e.Error != AssemblyError.None) == 0) {
+						File.WriteAllBytes (outputFile.Replace (".bin", ".rom"), rom);
+						Console.WriteLine ("Binary file " + outputFile.Replace (".bin", ".rom") + " saved");
+
+						File.WriteAllBytes (outputFile, output.Data);
+						Console.WriteLine ("Binary file " + outputFile + " saved");
+					} else {
+						Console.WriteLine ("Errors count:{0}",errors.Count(e => e.Error != AssemblyError.None));
+					}
 				}
 				else
 				{
@@ -235,33 +296,12 @@ namespace sass
 					else
 						File.WriteAllBytes (outputFile, output.Data);
 				}
-
-				var errors = from l in output.Listing
-				             where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
-				             orderby l.RootLineNumber
-				             select l;
-				if (!settings.Verbose) {
-					foreach (var listing in errors) {
-						if (listing.Error != AssemblyError.None)
-							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Error: " + listing.Error +". Code: " + listing.Code);
-						/// Cesc TODO: de moment comentat per no molestar, cal tornar a activar-ho i fer un condicional
-						//if (listing.Warning != AssemblyWarning.None)
-						//	Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning +". Code: " + listing.Code);
-					}
-				}
-			
-				if (settings.Verbose || settings.ListingOutput != null) {
-					var listing = GenerateListing (output);
-					if (settings.Verbose)
-						Console.Write (listing);
-					if (settings.ListingOutput != null)
-						File.WriteAllText (settings.ListingOutput, listing);
-				}
-
+					
 				if (settings.SymbolOutput != null)
 					WriteSymbols (settings.SymbolOutput, assembler);
 
-				Console.Error.WriteLine ("Assembly done: {0} ms", watch.ElapsedMilliseconds);
+				watch.Stop ();
+				Console.Error.WriteLine ("Assembly done: {0:F2} s", watch.ElapsedMilliseconds/1000d);
 				if (Debugger.IsAttached) {
 					Console.Error.WriteLine ("Press any key to continue...");
 					Console.ReadKey (true);
@@ -270,6 +310,30 @@ namespace sass
 			}
 			return -1;
         }
+
+		/// <summary>
+		/// Sets the ROM header:
+		///	.db "AB"             ; ID bytes
+		///	.dw initmain       	 ; cartridge initialization pointer
+		///	.dw 0                ; statement handler (not used)
+		///	.dw 0                ; device handler (not used)
+		///	.dw 0                ; BASIC program in ROM (not used, especially not in page 1)
+		///	.dw 0,0,0            ; reserved
+		/// </summary>
+		/// <param name="rom">Rom.</param>
+		/// <param name="ROMStart">ROM start.</param>
+		private static byte[] setROMHeader(int size, uint ROMStart)
+		{
+			byte[] rom = new byte[size]; //{ (byte)'A', (byte)'B' };
+			rom [0] = (byte)'A';
+			rom [1] = (byte)'B';
+			var romStart = BitConverter.GetBytes (ROMStart);
+			rom [2] = romStart.Take (2).ToArray () [0];
+			rom [3] = romStart.Take (2).ToArray () [1];
+			for (int i = 4; i < 16; i++)
+				rom [i] = 0;
+			return rom;
+		}
 
         private static void WriteSymbols(string path, Assembler assembler)
         {
@@ -368,6 +432,6 @@ namespace sass
 			Console.WriteLine("-s --symbols: \t\t\tsettings.SymbolOutput = args[++i];");
 			Console.WriteLine("-v --verbose: \t\t\tsettings.Verbose = true;");
 			Console.WriteLine("-as --asmsx: \t\tasMSX syntax");
-        }
-    }
+        }    
+	}
 }

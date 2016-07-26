@@ -5,7 +5,7 @@
 ; By:   Arr by Gryzor87        (c) 2013
 
 ;	org $c000
-; .org $4004 ;Nenez
+;.org $4004
 
 
 ; [ Song start data ]

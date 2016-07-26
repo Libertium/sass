@@ -9,6 +9,395 @@ namespace sass
 {
     public class ExpressionEngine
     {
+		public ExpressionEngine(AssemblySettings settings)
+		{
+			Symbols = new Dictionary<string, Symbol>();
+			RelativeLabels = new List<RelativeLabel>();
+			Settings = settings;
+		}
+			
+		private enum Precedence
+		{
+			None = 		11,
+			Unary = 	10,     // Not actually used.
+			Power = 	9,      // We use ^ to mean exponentiation.
+			Times = 	8,
+			Div = 		7,
+			Modulus = 	6,
+			Plus = 		5,
+			// Cesc
+			And = 		4,
+			Or = 		4,
+			Not = 		4,
+			RotateL = 	4,
+			RotateR = 	4,
+		}
+
+		public ulong Evaluate(string expression, uint PC, int rootLineNumber)
+		{
+			string expre = expression.Replace (" ", "");
+			if (expre == "0" || string.IsNullOrWhiteSpace(expre))
+				return 0;
+
+			if (expre.EndsWith ("_")) 
+				return (ulong)relativeLabels (expre, rootLineNumber);
+
+			// Cesc TODO, els operadors amb mes d'un caracter son problematics, es pot fer millor ?
+			return(ulong) EvaluateSimple (expre.Replace("<<", "<").Replace(">>",">"));
+		}
+
+		// Evaluate the expression.
+		public double EvaluateSimple(string expr)
+		{
+			int best_pos = 0;
+			int parens = 0;
+
+			int expr_len = expr.Length;
+			//if (expr_len == 0) return 0;
+
+			// If we find + or - now, then it's a unary operator.
+			bool is_unary = true;
+
+			// So far we have nothing.
+			Precedence best_prec = Precedence.None;
+
+			// Find the operator with the lowest precedence.
+			// Look for places where there are no open
+			// parentheses.
+			for (int pos = 0; pos < expr_len; pos++)
+			{
+				// Examine the next character.
+				char ch = expr[pos];
+
+				// Assume we will not find an operator. In
+				// that case, the next operator will not
+				// be unary.
+				bool next_unary = false;
+
+				if (ch == '(')
+				{
+					// Increase the open parentheses count.
+					parens += 1;
+
+					// A + or - after "(" is unary.
+					next_unary = true;
+				}
+				else if (ch == ')')
+				{
+					// Decrease the open parentheses count.
+					parens -= 1;
+
+					// An operator after ")" is not unary.
+					next_unary = false;
+
+					// If parens < 0, too many )'s.
+					if (parens < 0)
+						throw new FormatException("Too many close parentheses in '" + expr + "'");
+				}
+				else if (parens == 0)
+				{
+					// See if this is an operator.
+					if ((ch == '^') || (ch == '*') ||
+						(ch == '/') || (ch == '\\') ||
+						(ch == '%') || (ch == '+') ||
+						(ch == '-') || 
+						// Cesc
+						(ch == '&') || (ch == '|') ||
+						(ch == '~') || (ch == '!') ||
+						(ch == '<') || (ch == '>') 
+					)
+					{
+						// An operator after an operator is unary.
+						next_unary = true;
+
+						// See if this operator has higher precedence than the current one.
+						switch (ch)
+						{
+						case '^':
+							if (best_prec >= Precedence.Power)
+							{
+								best_prec = Precedence.Power;
+								best_pos = pos;
+							}
+							break;
+
+						case '*':
+						case '/':
+							if (best_prec >= Precedence.Times)
+							{
+								best_prec = Precedence.Times;
+								best_pos = pos;
+							}
+							break;
+
+						case '%':
+							if (best_prec >= Precedence.Modulus)
+							{
+								best_prec = Precedence.Modulus;
+								best_pos = pos;
+							}
+							break;
+
+						case '<':
+							if (best_prec >= Precedence.RotateL)
+							{
+								best_prec = Precedence.RotateL;
+								best_pos = pos;
+							}
+							break;
+
+						case '>':
+							if (best_prec >= Precedence.RotateR)
+							{
+								best_prec = Precedence.RotateR;
+								best_pos = pos;
+							}
+							break;
+
+						case '&':
+							if (best_prec >= Precedence.And)
+							{
+								best_prec = Precedence.And;
+								best_pos = pos;
+							}
+							break;
+
+						case '|':
+							if (best_prec >= Precedence.Or)
+							{
+								best_prec = Precedence.Or;
+								best_pos = pos;
+							}
+							break;
+
+						case '~':	// Cesc not
+						case '+':
+						case '-':
+							// Ignore unary operators
+							// for now.
+							if ((!is_unary) &&
+								best_prec >= Precedence.Plus)
+							{
+								best_prec = Precedence.Plus;
+								best_pos = pos;
+							}
+							break;
+						} // End switch (ch)
+					} // End if this is an operator.
+				} // else if (parens == 0)
+
+				is_unary = next_unary;
+			} // for (int pos = 0; pos < expr_len; pos++)
+
+			// If the parentheses count is not zero,
+			// there's a ) missing.
+			if (parens != 0)
+			{
+				throw new FormatException(
+					"Missing close parenthesis in '" + expr + "'");
+			}
+
+			// Hopefully we have the operator.
+			if (best_prec < Precedence.None)
+			{
+				string lexpr = expr.Substring(0, best_pos);
+				string rexpr = expr.Substring(best_pos + 1);
+				switch (expr[best_pos])
+				{
+				case '^':
+					return Math.Pow(EvaluateSimple(lexpr), EvaluateSimple(rexpr));
+				case '*':
+					return
+						EvaluateSimple(lexpr) * EvaluateSimple(rexpr);
+				case '/':
+					return
+						EvaluateSimple(lexpr) / EvaluateSimple(rexpr);
+				case '%':
+					return
+						EvaluateSimple(lexpr) % EvaluateSimple(rexpr);
+				case '+':
+					return
+						EvaluateSimple(lexpr) + EvaluateSimple(rexpr);
+				case '-':
+					return
+						EvaluateSimple(lexpr) - EvaluateSimple(rexpr);
+				case '&':
+					return
+						(double)((int)EvaluateSimple(lexpr) & (int)EvaluateSimple(rexpr));
+				case '|':
+					return
+						(double)((int)EvaluateSimple(lexpr) | (int)EvaluateSimple(rexpr));
+				case '<':
+					return
+						(double)((int)EvaluateSimple(lexpr) << (int)EvaluateSimple(rexpr));
+				case '>':
+					return
+						(double)((int)EvaluateSimple(lexpr) >> (int)EvaluateSimple(rexpr));					
+				}
+			}
+
+			// if we do not yet have an operator, there
+			// are several possibilities:
+			//
+			// 1. expr is (expr2) for some expr2.
+			// 2. expr is -expr2 or +expr2 for some expr2.
+			// 4. expr is a primitive.
+			// 5. It's a literal like "3.14159".
+
+			// Look for (expr2).
+			if (expr.StartsWith("(") && expr.EndsWith(")"))
+			{
+				// Remove the parentheses.
+				return EvaluateSimple(expr.Substring(1, expr_len - 2));
+			}
+
+			// Look for -expr2.
+			if (expr.StartsWith("-"))
+			{
+				return -EvaluateSimple(expr.Substring(1));
+			}
+
+			// Look for +expr2.
+			if (expr.StartsWith("+"))
+			{
+				return EvaluateSimple(expr.Substring(1));
+			}
+
+			// Look for ~expr2.
+			if (expr.StartsWith("~"))
+			{
+				return (double)(~(int)EvaluateSimple(expr.Substring(1)));
+			}
+
+			// See if it's a primitive.
+			if (Symbols.ContainsKey(expr.ToLower()))
+			{
+				// Return the corresponding value,
+				// converted into a Double.
+				try
+				{
+					// Try to convert the expression into a value.
+					//string s = Symbols[expr].Value.ToString();
+					//return double.Parse(s);
+					return Symbols[expr.ToLower()].Value;
+				}
+				catch (Exception)
+				{
+					throw new FormatException(
+						"Primative '" + expr +"' has value '" + Symbols[expr] + "' which is not a Double.");
+				}
+			}
+
+			// It must be a literal like "2.71828".
+			try
+			{
+				return interpretValue(expr,0);
+			}
+			catch (Exception)
+			{
+				throw new FormatException("Can't evaluate '" + expr + "' as a constant.");
+			}
+		}
+
+		/// <summary>
+		/// Check for relative labels (special case, because they're bloody annoying to parse)
+		/// </summary>
+		/// <returns>The labels.</returns>
+		/// <param name="expression">Expression.</param>
+		/// <param name="rootLineNumber">Root line number.</param>
+		double relativeLabels(string expression,int rootLineNumber)
+		{			
+			bool relative = true, firstPlus = false;
+			int offset = 0;
+			for (int i = 0; i < expression.Length - 1; i++) {
+				if (expression [i] == '-')
+					offset--;
+				else if (expression [i] == '+') {
+					if (firstPlus)
+						offset++;
+					else
+						firstPlus = true;
+				} else {
+					relative = false;
+					break;
+				}
+			}
+			if (relative) {
+				int i;
+				for (i = 0; i < RelativeLabels.Count; i++) {
+					if (RelativeLabels [i].RootLineNumber > rootLineNumber)
+						break;
+				}
+				i += offset;
+				if (i < 0 || i >= RelativeLabels.Count)
+					throw new KeyNotFoundException ("Relative label not found.");
+				return RelativeLabels [i].Address;
+			}
+			return 0d; // Cesc TODO excepcio no controlada ??
+		}
+
+		// Interpret value
+		double interpretValue (string expression, uint PC)
+		{
+			// Interpret value
+			if (expression == "$")
+				return PC;
+			else if (expression.StartsWith ("0x")) 
+				// Hex
+				return Convert.ToUInt64 (expression.Substring (2), 16);
+			// Cesc floats
+			else if (expression.Contains(".") && expression.Count (c => !"0123456789.".Contains (c)) == 0)
+				// Try to convert the expression into a Double.
+				return double.Parse(expression, CultureInfo.InvariantCulture);
+			else if (expression.StartsWith ("$") || (expression.EndsWith ("h") &&
+				expression.Remove (expression.Length - 1).ToLower ().Count (c => !"0123456789abcdef".Contains (c)) == 0))
+				return Convert.ToUInt64 (expression.Trim ('$', 'h'), 16);
+			else if (expression.StartsWith ("0b")) // Binary
+				return Convert.ToUInt64 (expression.Substring (2), 2);
+			else if (expression.StartsWith("%") || (expression.EndsWith("b") &&
+				expression.Remove(expression.Length - 1).ToLower().Count(c => !"01".Contains(c)) == 0))
+				return Convert.ToUInt64(expression.Trim('%', 'b'), 2);
+
+			else if (expression.StartsWith("0o")) // Octal
+				return Convert.ToUInt64(expression.Substring(2), 8);
+			else if (expression == "true")
+				return 1;
+			else if (expression == "false")
+				return 0;
+			else if (expression.StartsWith("'") && expression.EndsWith("'"))
+			{
+				var character = expression.Substring(1, expression.Length - 2).Unescape();
+				if (character.Length != 1)
+					throw new InvalidOperationException("Invalid character.");
+				return Settings.Encoding.GetBytes(character)[0];
+			}
+			else
+			{
+				// Check for number
+				bool number = true;
+				for (int i = 0; i < expression.Length; i++)
+					if (!char.IsNumber(expression[i]))
+						number = false;
+				if (number) // Decimal
+				if (expression == "") {
+					expression ="0";
+					return Convert.ToUInt64(expression);
+				}
+				else
+					return Convert.ToUInt64(expression);
+				else
+				{
+					// Look up reference
+					var symbol = expression.ToLower();
+					if (symbol.StartsWith("."))
+						symbol = symbol.Substring(1) + "@" + LastGlobalLabel;
+					if (Symbols.ContainsKey(symbol))
+						return Symbols[symbol].Value;
+					throw new KeyNotFoundException("The specified symbol:"+symbol+" was not found.");
+				}
+			}
+		}
+			
         public Dictionary<string, Symbol> Symbols { get; set; }
         public List<RelativeLabel> RelativeLabels { get; set; }
         public string LastGlobalLabel { get; set; }
@@ -27,281 +416,14 @@ namespace sass
                 new[] { "&&" },
                 new[] { "||" }
             };
-
-        public ExpressionEngine(AssemblySettings settings)
-        {
-            Symbols = new Dictionary<string, Symbol>();
-            RelativeLabels = new List<RelativeLabel>();
-            Settings = settings;
-        }
-
-        public ulong Evaluate(string expression, uint PC, int rootLineNumber)
-        {
-            expression = expression.Trim();
-            // Check for relative labels (special case, because they're bloody annoying to parse)
-            if (expression.EndsWith("_"))
-            {
-                bool relative = true, firstPlus = false;
-                int offset = 0;
-                for (int i = 0; i < expression.Length - 1; i++)
-                {
-                    if (expression[i] == '-')
-                        offset--;
-                    else if (expression[i] == '+')
-                    {
-                        if (firstPlus)
-                            offset++;
-                        else
-                            firstPlus = true;
-                    }
-                    else
-                    {
-                        relative = false;
-                        break;
-                    }
-                }
-                if (relative)
-                {
-                    int i;
-                    for (i = 0; i < RelativeLabels.Count; i++)
-                    {
-                        if (RelativeLabels[i].RootLineNumber > rootLineNumber)
-                            break;
-                    }
-                    i += offset;
-                    if (i < 0 || i >= RelativeLabels.Count)
-                        throw new KeyNotFoundException("Relative label not found.");
-                    return RelativeLabels[i].Address;
-                }
-            }
-            while (expression.SafeContains('(') && expression.SafeContains(')'))
-            {
-                int index = -1;
-                int length = -1;
-                GetParenthesis(expression, out index, out length);
-                var subexpression = expression.Substring(index + 1, length - 2);
-                expression = expression.Remove(index) + Evaluate(subexpression, PC, rootLineNumber) +
-                    expression.Substring(index + length);
-            }
-            // Check for parenthesis
-            if (HasOperators(expression))
-            {
-                // Recurse
-                var parts = SplitExpression(expression);
-                if (parts[0] == "" && parts[1] == "-") // Negate
-                    return (ulong)-(long)Evaluate(parts[2], PC, rootLineNumber);
-                if (parts[0] == "" && parts[1] == "~") // NOT
-                    return ~Evaluate(parts[2], PC, rootLineNumber);
-                if (parts[0] == string.Empty && parts[1] == "%")
-                    return Convert.ToUInt64(expression.Trim('%', 'b'), 2);
-                switch (parts[1]) // Evaluate
-                {
-                    case "+":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               +
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "-":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               -
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "*":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               *
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "/":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               /
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "%":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               %
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "<<":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               <<
-                               (int)Evaluate(parts[2], PC, rootLineNumber);
-                    case ">>":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               >>
-                               (int)Evaluate(parts[2], PC, rootLineNumber);
-                    case "<":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               <
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case "<=":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               <=
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case ">":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               >
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case ">=":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               >=
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case "==":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               ==
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case "!=":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               !=
-                               Evaluate(parts[2], PC, rootLineNumber) ? 1UL : 0UL;
-                    case "&":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               &
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "^":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               ^
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "|":
-                        return Evaluate(parts[0], PC, rootLineNumber)
-                               |
-                               Evaluate(parts[2], PC, rootLineNumber);
-                    case "&&":
-                        return (Evaluate(parts[0], PC, rootLineNumber) == 1
-                               &&
-                               Evaluate(parts[2], PC, rootLineNumber) == 1) ? 1UL : 0UL;
-                    case "||":
-                        return (Evaluate(parts[0], PC, rootLineNumber) == 1
-                               ||
-                               Evaluate(parts[2], PC, rootLineNumber) == 1) ? 1UL : 0UL;
-                }
-            }
-            else
-            {
-                // Interpret value
-				if (expression == "$")
-					return PC;
-				else if (expression.StartsWith ("0x")) // Hex
-                    return Convert.ToUInt64 (expression.Substring (2), 16);
-				else if (expression.StartsWith ("$") || (expression.EndsWith ("h") &&
-				                     expression.Remove (expression.Length - 1).ToLower ().Count (c => !"0123456789abcdef".Contains (c)) == 0))
-					return Convert.ToUInt64 (expression.Trim ('$', 'h'), 16);
-				else if (expression.StartsWith ("0b")) // Binary
-                    return Convert.ToUInt64 (expression.Substring (2), 2);
-				// Binary Cesc
-				else if (expression.EndsWith ("b") && this.IsBinaryString(expression.Substring(0,expression.Length-1))) { 
-					// Console.WriteLine ("Cesc Binary value:" + expression + "Valor: " + expression.Substring(0,expression.Length-1));
-					return Convert.ToUInt64 (expression.Substring(0,expression.Length-1), 2);
-				}
-                else if (expression.StartsWith("$") || (expression.EndsWith("h") &&
-                    expression.Remove(expression.Length - 1).ToLower().Count(c => !"01".Contains(c)) == 0))
-                    return Convert.ToUInt64(expression.Trim('%', 'b'), 2);
-                else if (expression.StartsWith("0o")) // Octal
-                    return Convert.ToUInt64(expression.Substring(2), 8);
-                else if (expression == "true")
-                    return 1;
-                else if (expression == "false")
-                    return 0;
-                else if (expression.StartsWith("'") && expression.EndsWith("'"))
-                {
-                    var character = expression.Substring(1, expression.Length - 2).Unescape();
-                    if (character.Length != 1)
-                        throw new InvalidOperationException("Invalid character.");
-                    return Settings.Encoding.GetBytes(character)[0];
-                }
-                else
-                {
-                    // Check for number
-                    bool number = true;
-                    for (int i = 0; i < expression.Length; i++)
-                        if (!char.IsNumber(expression[i]))
-                            number = false;
-					if (number) // Decimal
-					if (expression == "") {
-						// Cesc valor per defecte 0
-						//Console.WriteLine("Expression is void at root line number: " +rootLineNumber);
-						//throw new KeyNotFoundException("Expression is void at root line number: " +rootLineNumber);
-						expression ="0";
-						return Convert.ToUInt64(expression);
-					}
-					else
-                        return Convert.ToUInt64(expression);
-                    else
-                    {
-                        // Look up reference
-                        var symbol = expression.ToLower();
-                        if (symbol.StartsWith("."))
-                            symbol = symbol.Substring(1) + "@" + LastGlobalLabel;
-                        if (Symbols.ContainsKey(symbol))
-                            return Symbols[symbol].Value;
-                        throw new KeyNotFoundException("The specified symbol was not found.");
-                    }
-                }
-            }
-            throw new InvalidOperationException("Invalid expression");
-        }
-
-        private void GetParenthesis(string expression, out int index, out int length)
-        {
-            length = -1;
-            index = -1;
-            int stack = 1;
-            bool inChar = false, suspendEvaluation = false;
-            for (int i = 0; i < expression.Length && stack != 0; i++)
-            {
-                if (expression[i] == '(' && !inChar)
-                {
-                    if (length == -1)
-                    {
-                        length = 0;
-                        index = i;
-                    }
-                    else
-                        stack++;
-                }
-                if (expression[i] == ')' && !inChar)
-                    stack--;
-                if (expression[i] == '\'' && !suspendEvaluation)
-                    inChar = !inChar;
-                if (suspendEvaluation)
-                    suspendEvaluation = false;
-                else if (expression[i] == '\\')
-                    suspendEvaluation = true;
-                if (length >= 0)
-                    length++;
-            }
-        }
-
-        private string[] SplitExpression(string expression)
-        {
-            for (int i = Operators.Length - 1; i >= 0; i--)
-            {
-                for (int j = 0; j < Operators[i].Length; j++)
-                {
-                    int index = expression.SafeIndexOf(Operators[i][j]);
-                    if (index != -1)
-                    {
-                        // Split along this operator
-                        return new[]
-                            {
-                                expression.Remove(index),
-                                Operators[i][j],
-                                expression.Substring(index + Operators[i][j].Length)
-                            };
-                    }
-                }
-            }
-            return null;
-        }
-
-        private bool HasOperators(string expression)
-        {
-            for (int i = 0; i < Operators.Length; i++)
-            {
-                for (int j = 0; j < Operators[i].Length; j++)
-                {
-                    if (expression.SafeContains(Operators[i][j]))
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        public static byte[] ConvertFromBinary(string binary)
+						
+		/// <summary>
+		/// The Z80 is a little-endian
+		/// Converts from binary to little-endian byte[].
+		/// </summary>
+		/// <returns>The from binary.</returns>
+		/// <param name="binary">Binary.</param>
+		public static byte[] ConvertFromBinary(string binary)
         {
             while (binary.Length % 8 != 0)
                 binary = "0" + binary;
@@ -316,6 +438,11 @@ namespace sass
             return result;
         }
 
+		/// <summary>
+		/// Determines str is binary.
+		/// </summary>
+		/// <returns><c>true</c> if this instance is binary string the specified str; otherwise, <c>false</c>.</returns>
+		/// <param name="str">String.</param>
 		bool IsBinaryString(string str)
 		{
 			foreach (char c in str)
@@ -326,5 +453,7 @@ namespace sass
 
 			return true;
 		}
+
+
     }
 }

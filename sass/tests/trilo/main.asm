@@ -22,6 +22,7 @@
 ;	.bios
 	.page 1
 	.rom 
+;  	.MEGAROM	KonamiSCC
 	.start	initmain
 	;.dw	0,0,0,0,0,0	
 	;.ds	12
@@ -54,7 +55,45 @@ initmain:
     
 	ld      h,0x80
 	call    0x24        
-	
+
+/*
+	SEARCH_SLOTSET:
+	call	SEARCH_SLOT
+	;;ld		[SLOTVAR], a
+
+;
+; SEARCH_SLOT
+; Busca slot de nuestro rom siempre que se ejecute en 04000h-07FFFh (pagina1)
+;----------------------------------------------------------
+SEARCH_SLOT:
+	call	0x138	;RSLREG			; =$0138
+	rrca
+	rrca
+	and		3				; a = page1-slot-config (=xxxxxxPP)
+	ld		c, a			; c = page1-slot-config (=xxxxxxPP)
+	ld		b, 0			; bc = a
+	ld		hl, 0xfcc1; EXPTBL		; =$FCC1
+	add		hl, bc			; hl = EXPTBL + bc
+	ld		a, [hl]			; a = primary slot selection register value
+	and		$80				; a =$80 -> expanded slot 
+	jr		z, SEARCH_SLOT0	; go to not expanded slot 
+	; expanded slot
+	or		c				; a = $80 or page1-slot-config (=ExxxxxPP)
+	ld		c, a			; c = (=ExxxxxPP)
+	inc		hl
+	inc		hl
+	inc		hl
+	inc		hl
+	ld		a, [hl]			; get secondary slot selection register value
+	and		$0C				; a = secondary slot selection register value xxxxSSxx
+SEARCH_SLOT0:
+	or		c				; a = a or c (=ExxxSSPP) // SS=00 if not expanded slot
+	ld		h, $80
+	call	0x24        ;	ENASLT
+*/		
+
+
+
 	;clear RAM [first kb only]
 	ld	bc,1024
 	ld	hl,0xc000
@@ -72,7 +111,7 @@ megarom_bank3	.equ		0B000h
 	ld [megarom_bank0],a
 	inc a
 	ld [megarom_bank1],a
-	ld	a,0x5f
+	ld	a,0x3F
 	ld [megarom_bank2],a
 	inc a
 	ld [megarom_bank3],a
@@ -134,8 +173,11 @@ isr:
 ; Cesc test per fer que generi un rom de 32KB	
 ;	.PAGE 2
 	.org 0x6000
+	.subpage 1 at $6000	
 demo_song:
-	.INCLUDE	".\tests\trilo\demosong2.asm"
+	.INCLUDE	".\tests\trilo\neme2int.asm"
+
+	.subpage 15 at $8000	
 
 ;;	map	0xc000
 ;	.org 0xc000 ; Cesc test
@@ -143,3 +185,4 @@ demo_song:
 
 	.INCLUDE	".\tests\trilo\ttreplayRAM.asm"
 pattern:	.ds 1
+

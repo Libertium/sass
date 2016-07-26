@@ -16,6 +16,7 @@ namespace sass
         InvalidExpression = 6,
         UnknownSymbol = 7,
         UncoupledStatement = 8,
-        ValueTruncated = 9
+        ValueTruncated = 9,
+		MegaROMSubpageOverflow =10
     }
 }
