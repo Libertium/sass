@@ -1,21 +1,21 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace sass
+namespace sasSX
 {
-    public class ExpressionEngine
-    {
+	public class ExpressionEngine
+	{
 		public ExpressionEngine(AssemblySettings settings)
 		{
 			Symbols = new Dictionary<string, Symbol>();
 			RelativeLabels = new List<RelativeLabel>();
 			Settings = settings;
 		}
-			
+
 		private enum Precedence
 		{
 			None = 		11,
@@ -182,15 +182,13 @@ namespace sass
 								best_pos = pos;
 							}
 							break;
-						} // End switch (ch)
-					} // End if this is an operator.
-				} // else if (parens == 0)
-
+						} 
+					} 
+				} 
 				is_unary = next_unary;
-			} // for (int pos = 0; pos < expr_len; pos++)
+			}
 
-			// If the parentheses count is not zero,
-			// there's a ) missing.
+			// If the parentheses count is not zero, there's a ) missing.
 			if (parens != 0)
 			{
 				throw new FormatException(
@@ -241,6 +239,7 @@ namespace sass
 			//
 			// 1. expr is (expr2) for some expr2.
 			// 2. expr is -expr2 or +expr2 for some expr2.
+			// 3. expr is Fun(expr2) for a function Fun.
 			// 4. expr is a primitive.
 			// 5. It's a literal like "3.14159".
 
@@ -269,16 +268,29 @@ namespace sass
 				return (double)(~(int)EvaluateSimple(expr.Substring(1)));
 			}
 
+			// Look for Fun(expr2).
+			if (expr_len > 5 && expr.EndsWith(")"))
+			{
+				// Find the first (.
+				int paren_pos = expr.IndexOf("(");
+				if (paren_pos > 0)
+				{
+					// See what the function is.
+					string lexpr = expr.Substring(0, paren_pos);
+					string rexpr = expr.Substring(paren_pos + 1, expr_len - paren_pos - 2);
+					switch (lexpr.ToLower())
+					{
+					case "int":
+						return (int)(EvaluateSimple(rexpr));
+					}
+				}
+			}
+
 			// See if it's a primitive.
 			if (Symbols.ContainsKey(expr.ToLower()))
 			{
-				// Return the corresponding value,
-				// converted into a Double.
 				try
 				{
-					// Try to convert the expression into a value.
-					//string s = Symbols[expr].Value.ToString();
-					//return double.Parse(s);
 					return Symbols[expr.ToLower()].Value;
 				}
 				catch (Exception)
@@ -289,14 +301,28 @@ namespace sass
 			}
 
 			// It must be a literal like "2.71828".
+
+			return interpretValue(expr,0);
+			/*
 			try
 			{
 				return interpretValue(expr,0);
 			}
 			catch (Exception)
 			{
-				throw new FormatException("Can't evaluate '" + expr + "' as a constant.");
-			}
+				if (expr.Contains ('[') ||
+					expr.Contains (']')|| 
+					expr.Contains ("@@")) {
+					Console.WriteLine ("Syntax error in {0}. Is for asmsx ? use the modifier --asmsx.", expr);
+					return 0;
+					//throw new FormatException ("Error evaluating '" + expr + "' as a constant." +
+					//	"Error, is syntax is asmsx, use the modifier --asmsx.");
+				} else {
+					//throw new FormatException ("Error evaluating '" + expr + "' as a constant.");
+					Console.WriteLine ("Error evaluating '" + expr + "' as a constant.");
+					return 0;
+				}
+			}*/
 		}
 
 		/// <summary>
@@ -376,47 +402,47 @@ namespace sass
 				// Check for number
 				bool number = true;
 				for (int i = 0; i < expression.Length; i++)
-					if (!char.IsNumber(expression[i]))
+					if (!char.IsNumber (expression [i])) {
 						number = false;
-				if (number) // Decimal
-				if (expression == "") {
-					expression ="0";
-					return Convert.ToUInt64(expression);
-				}
-				else
-					return Convert.ToUInt64(expression);
-				else
-				{
+						break;
+					}
+				if (number) {
+					if (expression == "") {
+						expression = "0";
+						return Convert.ToUInt64 (expression);
+					} else
+						return Convert.ToUInt64 (expression);
+				} else {
 					// Look up reference
-					var symbol = expression.ToLower();
-					if (symbol.StartsWith("."))
-						symbol = symbol.Substring(1) + "@" + LastGlobalLabel;
-					if (Symbols.ContainsKey(symbol))
-						return Symbols[symbol].Value;
-					throw new KeyNotFoundException("The specified symbol:"+symbol+" was not found.");
+					var symbol = expression.ToLower ();
+					if (symbol.StartsWith ("."))
+						symbol = symbol.Substring (1) + "@" + LastGlobalLabel;
+					if (Symbols.ContainsKey (symbol))
+						return Symbols [symbol].Value;
+					throw new KeyNotFoundException ("The specified symbol:" + symbol + " was not found.");
 				}
 			}
 		}
-			
-        public Dictionary<string, Symbol> Symbols { get; set; }
-        public List<RelativeLabel> RelativeLabels { get; set; }
-        public string LastGlobalLabel { get; set; }
-        public AssemblySettings Settings { get; set; }
-        // Grouped by priority, based on C operator precedence
-        public static string[][] Operators = new[]
-            {
-                new[] { "*", "/", "%" },
-                new[] { "+", "-" },
-                new[] { "<", "<=", ">", ">=" },
-                new[] { "<<", ">>" },
-                new[] { "==", "!=" },
-                new[] { "&" },
-                new[] { "^" },
-                new[] { "|" },
-                new[] { "&&" },
-                new[] { "||" }
-            };
-						
+
+		public Dictionary<string, Symbol> Symbols { get; set; }
+		public List<RelativeLabel> RelativeLabels { get; set; }
+		public string LastGlobalLabel { get; set; }
+		public AssemblySettings Settings { get; set; }
+		// Grouped by priority, based on C operator precedence
+		public static string[][] Operators = new[]
+		{
+			new[] { "*", "/", "%" },
+			new[] { "+", "-" },
+			new[] { "<", "<=", ">", ">=" },
+			new[] { "<<", ">>" },
+			new[] { "==", "!=" },
+			new[] { "&" },
+			new[] { "^" },
+			new[] { "|" },
+			new[] { "&&" },
+			new[] { "||" }
+		};
+
 		/// <summary>
 		/// The Z80 is a little-endian
 		/// Converts from binary to little-endian byte[].
@@ -424,19 +450,19 @@ namespace sass
 		/// <returns>The from binary.</returns>
 		/// <param name="binary">Binary.</param>
 		public static byte[] ConvertFromBinary(string binary)
-        {
-            while (binary.Length % 8 != 0)
-                binary = "0" + binary;
-            byte[] result = new byte[binary.Length / 8];
-            int i = result.Length - 1;
-            while (binary.Length > 0)
-            {
-                string octet = binary.Substring(binary.Length - 8);
-                binary = binary.Remove(binary.Length - 8);
-                result[i--] = Convert.ToByte(octet, 2);
-            }
-            return result;
-        }
+		{
+			while (binary.Length % 8 != 0)
+				binary = "0" + binary;
+			byte[] result = new byte[binary.Length / 8];
+			int i = result.Length - 1;
+			while (binary.Length > 0)
+			{
+				string octet = binary.Substring(binary.Length - 8);
+				binary = binary.Remove(binary.Length - 8);
+				result[i--] = Convert.ToByte(octet, 2);
+			}
+			return result;
+		}
 
 		/// <summary>
 		/// Determines str is binary.
@@ -450,10 +476,7 @@ namespace sass
 				if (c < '0' || c > '1')
 					return false;
 			}
-
 			return true;
 		}
-
-
-    }
+	}
 }

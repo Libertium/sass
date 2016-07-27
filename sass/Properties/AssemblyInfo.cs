@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("sass")]
-[assembly: AssemblyDescription("SirCmpwn's Assembler")]
+[assembly: AssemblyTitle("sasSX")]
+[assembly: AssemblyDescription("SirCmpwn's Assembler MSX")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("sass")]
-[assembly: AssemblyCopyright("Copyright © KnightOS Team 2012-2014")]
+[assembly: AssemblyProduct("sasSX")]
+[assembly: AssemblyCopyright("Copyright © KnightOS Team 2012-2014 © Libertium Games 2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

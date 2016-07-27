@@ -1,6 +1,6 @@
 ﻿
-TODO: actualitzat el 14-7-2016
-=====
+TODO: actualitzat el 27-7-2016
+==============================
 
 (Ok) Resoldre problema de linia amb comentari que dona error al ensamblar
 (Ok) Modificador --asmsx per compatibilitzar el codi generat per aquest ensamblador
@@ -14,13 +14,10 @@ TODO: actualitzat el 14-7-2016
 (Ok) Fer que als DB accepti nombres negatius
 (Ok) Als include no fa @@label: sigui sinonim de .label: amb el modificador --asmsx
 (Ok) Als .fill o .ds detectar i limitar el tamany a un maxim de 0xFFFF
-() Als .block detectar i limitar el tamany a un maxim de 0xFFFF
 (Ok) Problema al avaluar les expresions negatives:
 	TRACK_Instrument_CESC		.equ 0-17
 	ld hl,TRACK_Instrument_CESC	--> Error: ValueTruncated
-(Validar) Validar el calcul de expressions per exemple .equ value 0x1234 - 28
-() Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
-() Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
+(Ok) Fer que accepti les directives: "module bios .... endmodule" per poder fer referencia a les etiques de la forma: bios.RUTINA
 (Cesc) Implementar la directiva .rom: els .org al rang 0x4000-0xBFFF fan que les dades al binari de sortida es generin en trams de 8Kb
 (Cesc) Revisar els ORG que no funcionen com es d'esperar
 (Cesc) Incorporar les directives subpage per poder generar megaroms:
@@ -28,14 +25,23 @@ TODO: actualitzat el 14-7-2016
 		() Error: megaROM subpage overflow: ds (1024*8)+1
 		() Warning: 12 out of 15 megaROM pages are not defined: .subpage 2 at $8000	, .subpage 15 at $A000, .subpage 1 at $6000	
 		(Ok) .subpage 0 at $4000 es implicit
+(Ok) Treure les expressions regulars per /* */ i // , fer-ho al fer la lectura, per tenir el nombres de linies correctes.
+(Ok) Treure el --cv VerboseLevel == VerboseLevels.Diagnostic i fer que el --verbose pugui tenir n graus de detall:
+	-verbose[:level] Specifies the amount of information to display in the build log. Each logger displays events based 
+	on the verbosity level that you set for that logger. You can specify the following verbosity levels: 
+	0/q[uiet], 1/m[inimal], 2/n[ormal], 3/d[etailed], and 4/diag[nostic].
+
 () Controlar millor el MegaROMSubpageOverflow, ara nomes es controla amb els .ORG
-() Treure les expressions regulars per /* */ i fer-ho al fer la lectura, per tenir el nombres de linies correctes.
 () El .phase .dephase no funciona del tot correctament, segurament a les referencies absolutes dins del propi bloc.
 () El .rept no funciona correctament, falta omplir els bytes del bloc que de moment queda amb 00's
-() Treure el --cv CescVerbose i fer que el --verbose pugui tenir n graus de detall
+() Als .block detectar i limitar el tamany a un maxim de 0xFFFF
+
+() Validar el calcul de expressions per exemple .equ value 0x1234 - 28
+() Validar que els echo [message], [message], ... funcionin. Sembla que de moment només ens dona el pc de l'etiqueta ??
+
 () Treure els Console.WriteLine i implementar-ho amb els entry.Warning i entry.Error o d'alguna forma semblant.
 () Un cop implementat tot, encapsular en un tipus Parametres totes les propietats de la classe Assembler:
-		public bool CescVerbose { get; set; }
+		public bool VerboseLevel == VerboseLevels.Diagnostic { get; set; }
 		public bool ASMSX { get; set; }
 		public bool IsROM = false;
 		public bool IsMegaROM = false;
@@ -48,6 +54,7 @@ TODO: actualitzat el 14-7-2016
 		ulong repeatAmount;
 		uint phasePC { get; set; }
 		uint dephasePC { get; set; }
+
 () Implementar correctament:
 	case "echo":		// Cesc TODO: cal formatar en cada cas
 	case "print":		// Cesc TODO: cal formatar en cada cas

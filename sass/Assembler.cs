@@ -6,7 +6,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace sass
+namespace sasSX
 {
     public class Assembler
     {
@@ -27,14 +27,17 @@ namespace sass
         private Stack<string> FileNames { get; set; }
         private Stack<bool> IfStack { get; set; }
         private Stack<bool> WorkingIfStack { get; set; }
-        private int SuspendedLines { get; set; }
+        /// <summary>
+        /// Gets or sets the suspended lines.
+        /// </summary>
+        /// <value>The suspended lines.</value>
+		private int SuspendedLines { get; set; }
         private int CurrentIndex { get; set; }
         private string CurrentLine { get; set; }
         private bool Listing { get; set; }
 
-
-		public bool EnableVerbose { get; set; }
 		private string moduleNamespace = "";
+
 		/// <summary>
 		/// Cesc: Gets or sets a value indicating whether this <see cref="sass.Assembler"/> is ASMS.
 		/// </summary>
@@ -89,30 +92,13 @@ namespace sass
         {
             Output = new AssemblyOutput();
             Output.InstructionSet = InstructionSet;
+			bool blockComent = false;
 
 			// Cesc
 			//assembly = assembly.Replace("\r", "");
 			assembly = assembly.Replace("\r", "").Replace('\t',' ');
 			if (ASMSX)
 				assembly = assembly.Replace ("@@", ".");
-
-			// Cesc Eliminar els comentaris del tipus /* */ o //
-			if (ASMSX) {
-				var blockComments = @"/\*(.*?)\*/";
-				var lineComments = @"//(.*?)\r?\n";
-				var strings = @"""((\\[^\n]|[^""\n])*)""";
-				var verbatimStrings = @"@(""[^""]*"")+";
-
-				assembly = Regex.Replace (assembly,
-					blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
-					me => {
-						if (me.Value.StartsWith ("/*") || me.Value.StartsWith ("//"))
-							return me.Value.StartsWith ("//") ? Environment.NewLine : "";
-						// Keep the literal strings
-						return me.Value;
-					},
-					RegexOptions.Singleline);
-			}
 
             PC = 0;
             Lines = assembly.Split('\n');
@@ -122,7 +108,37 @@ namespace sass
             IfStack.Push(true);
             for (CurrentIndex = 0; CurrentIndex < Lines.Length; CurrentIndex++)
             {
-                CurrentLine = Lines[CurrentIndex].Trim().TrimComments();					
+				CurrentLine = Lines [CurrentIndex].Trim ().TrimComments ();					
+
+				/// Cesc for ASMSX, remove block coments /* */ and //
+				if (ASMSX) {
+					if (blockComent) {
+						if (Lines [CurrentIndex].IndexOf ("*/") != -1) {
+							if (Settings.Verbose == VerboseLevels.Diagnostic)
+								Console.WriteLine ("{0} End block comment: {1} {2}", FileNames.Peek (), LineNumbers.Peek (), RootLineNumber);
+						
+							CurrentLine = Lines [CurrentIndex].Substring (
+								Lines [CurrentIndex].IndexOf ("*/") + 2).Trim ().TrimComments ();
+							blockComent = false;
+						} else {
+							CurrentLine = "";
+						}
+					}
+					if (!blockComent) {
+						if (Lines [CurrentIndex].IndexOf ("/*") != -1) {
+							blockComent = true;
+							if (Settings.Verbose == VerboseLevels.Diagnostic)
+								Console.WriteLine ("{0} Begind block comment: {1} {2}", FileNames.Peek (), LineNumbers.Peek (), RootLineNumber);
+							
+							CurrentLine = Lines [CurrentIndex].Substring (
+								0, Lines [CurrentIndex].IndexOf ("/*")).Trim ().TrimComments ();						
+						} 
+					}
+					// remove single line coments: "//"
+					if (CurrentLine.IndexOf ("//") != -1)
+						CurrentLine = CurrentLine.Substring (0, CurrentLine.IndexOf ("//"));
+				}
+
                 if (SuspendedLines == 0)
                 {
                     LineNumbers.Push(LineNumbers.Pop() + 1);
@@ -426,6 +442,11 @@ namespace sass
 					if (string.IsNullOrEmpty (CurrentLine) || !Listing) {
 						continue;
 					} else {
+
+						/// Cesc verbose
+						if(Settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
+
 						// Check instructions
 						var match = InstructionSet.Match (CurrentLine);
 						if (match == null)
@@ -490,17 +511,28 @@ namespace sass
         {
             var finalBinary = new List<byte>();
             ExpressionEngine.LastGlobalLabel = null;
+			/*foreach(ORGItem item in ORGsList)
+			{
+				Console.WriteLine (" ORG: 0x{0:X}-0x{1:X}", item.ORGAdress, item.ORGLength);				
+			}*/
 
             for (int i = 0; i < output.Listing.Count; i++)
             {
                 var entry = output.Listing[i];
+				/// Cesc
+				//Console.WriteLine(">> {0} {1} {2} \t\t {3}", entry.FileName, entry.LineNumber, entry.Code, entry.Instruction, entry.Output);
                 RootLineNumber = entry.RootLineNumber;
                 PC = entry.Address;
                 LineNumbers = new Stack<int>(new[] { entry.LineNumber });
                 if (entry.CodeType == CodeType.Directive)
                 {
+					// Cesc
+					//Console.WriteLine ("Finish directives: " + entry.Code);
+
 					// PassTwo
 					if (entry.PostponeEvalulation) {
+						/// Cesc
+						// Console.WriteLine ("Pass Two: " + entry.Code);
 						output.Listing [i] = HandleDirective (entry.Code, true);
 					}
 
@@ -616,6 +648,7 @@ namespace sass
 
 		private void addToORGList(uint currentPC, uint PC, uint subpage)
 		{
+			//ORGsList.Add(new ORGItem(paramter, currentPC));
 			if (ORGsList.Count > 0) {
 				ORGItem last = ORGsList.Last ();
 				ORGsList.Remove (last);
@@ -630,6 +663,9 @@ namespace sass
 
         private Listing HandleDirective(string line, bool passTwo = false)
         {
+			// Cesc debug directives
+			//Console.WriteLine (line);
+
             string directive = line.Substring(1).Trim();
             string[] parameters = new string[0];
             string parameter = "";
@@ -652,6 +688,8 @@ namespace sass
                 RootLineNumber = RootLineNumber
             };
 
+			// Cesc
+			// if (passTwo) Console.WriteLine ("Pass Two");
             try
             {
                 switch (directive)
@@ -729,13 +767,13 @@ namespace sass
                             foreach (var p in parameters)
                             {
                                 if (p.Trim().StartsWith("\"") && p.Trim().EndsWith("\""))
-                                    result.AddRange(
-										Settings.Encoding.GetBytes(p.Trim().Substring(1, p.Trim().Length - 2).Unescape()));
+                                    result.AddRange(Settings.Encoding.GetBytes(p.Trim().Substring(1, p.Trim().Length - 2).Unescape()));
                                 else
                                 {
                                     try
                                     {
-										result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));										
+										result.Add((byte)ExpressionEngine.Evaluate(p, PC++, RootLineNumber));
+										
                                     }
                                     catch (KeyNotFoundException)
                                     {
@@ -793,39 +831,43 @@ namespace sass
 					case "printdec":	// Cesc TODO: cal formatar en cada cas
 					case "printtext":
                     {
-                        if (passTwo)
-                        {
-                            string output = "";
-                            bool formatOutput = false;
-                            List<object> formatParameters = new List<object>();
-                            foreach (var item in parameters)
-                            {
-                                if (item.Trim().StartsWith("\"") && item.EndsWith("\""))
-                                {
-                                    output += item.Substring(1, item.Length - 2);
-                                    formatOutput = true;
-                                }
-                                else
-                                {
-                                    if (!formatOutput)
-                                        output += ExpressionEngine.Evaluate(item, PC, RootLineNumber);
-                                    else
-                                    {
-                                        formatParameters.Add(ExpressionEngine.Evaluate(item, PC, RootLineNumber));
-                                    }
-                                }
-                            }
-                            if (formatOutput)
-                                output = string.Format(output, formatParameters.ToArray());
-                            Console.WriteLine((directive == "error" ? "User Error: " : "") + output);
-                            return listing;
-                        }
-                        else
-                        {
-                            listing.PostponeEvalulation = true;
-                            return listing;
-                        }
-						//break;
+						if(Settings.Verbose != VerboseLevels.Quiet &&
+							Settings.Verbose != VerboseLevels.Diagnostic)
+						{
+	                        if (passTwo)
+	                        {
+	                            string output = "";
+	                            bool formatOutput = false;
+	                            List<object> formatParameters = new List<object>();
+	                            foreach (var item in parameters)
+	                            {
+	                                if (item.Trim().StartsWith("\"") && item.EndsWith("\""))
+	                                {
+	                                    output += item.Substring(1, item.Length - 2);
+	                                    formatOutput = true;
+	                                }
+	                                else
+	                                {
+	                                    if (!formatOutput)
+	                                        output += ExpressionEngine.Evaluate(item, PC, RootLineNumber);
+	                                    else
+	                                    {
+	                                        formatParameters.Add(ExpressionEngine.Evaluate(item, PC, RootLineNumber));
+	                                    }
+	                                }
+	                            }
+	                            if (formatOutput)
+	                                output = string.Format(output, formatParameters.ToArray());
+	                            Console.WriteLine((directive == "error" ? "User Error: " : "") + output);
+	                            return listing;
+	                        }
+	                        else
+	                        {
+	                            listing.PostponeEvalulation = true;
+	                            return listing;
+	                        }
+						}
+						break;
                     }
                     case "end":
 					{
@@ -869,19 +911,34 @@ namespace sass
 							{
 								uint currentPC = PC;
 								PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+
+								if(Settings.Verbose == VerboseLevels.Diagnostic)
+									Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+									PC, parameter, RootLineNumber,currentPC);
+
 								addToORGList(currentPC, PC,0);
 							}
 							else
 							{
+								/// TODO: aixo no es del tot correcte, si el ORG esta dins la pagina pero el codi
+								/// posterior creix fora d'aquesta tindrem un problema :p
 								uint currentPC = PC;
 								PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
-								listing.Error = AssemblyError.MegaROMSubpageOverflow;  
+								if(Settings.Verbose == VerboseLevels.Diagnostic)
+									Console.WriteLine("<< Subpage Overflow, Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2}, now {3:X} >>", 
+									PC, parameter, RootLineNumber,currentPC, now);
+								
+								listing.Error = AssemblyError.MegaROMSubpageOverflow;  // megaROM subpage overflow
 							}
 						}
 						else
 						{
 							uint currentPC = PC;
 	                        PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+
+							if(Settings.Verbose == VerboseLevels.Diagnostic)
+								Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+									PC, parameter, RootLineNumber,currentPC);
 							addToORGList(currentPC, PC,0);
 						}
                         return listing;
@@ -905,12 +962,22 @@ namespace sass
                                 PC = 0xc000;
                                 break;
                         }
+						// Cesc TODO el org encara no es comporta com esperem ?
+						if(Settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine("<< Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2} >>", 
+								PC, parameter, RootLineNumber, currentPC);
+						
 						addToORGList(currentPC, PC,0);
                         return listing;
 					}
+
+					/// .subpage 15 at $A000	
 					case "subpage":
 					{
 						if (parameters.Length != 4){
+							if(Settings.Verbose == VerboseLevels.Diagnostic)
+								Console.WriteLine(".subpage {0} {1} {2}",parameters[0], parameters[1], parameters[2]);
+
 							uint currentPC = PC;
 							PC = (uint)ExpressionEngine.Evaluate(parameters[2], PC, RootLineNumber);
 							currentSubpageORG = PC;
@@ -925,7 +992,7 @@ namespace sass
 
 					case "verbose":
 					{
-						EnableVerbose = true;
+						Settings.Verbose = VerboseLevels.Normal;
 						break;
 					}
 					case "bios":
@@ -945,25 +1012,9 @@ namespace sass
                         LineNumbers.Push(0);
                         string includedFile = File.ReadAllText(file) + "\n.endfile";
 
-						Console.WriteLine("Include: "+file);
+						if(Settings.Verbose != VerboseLevels.Quiet)
+							Console.WriteLine("Include: "+file);
 
-						// Cesc Eliminar els comentaris del tipus /* */ o //
-						if (ASMSX){
-							var blockComments = @"/\*(.*?)\*/";
-							var lineComments = @"//(.*?)\r?\n";
-							var strings = @"""((\\[^\n]|[^""\n])*)""";
-							var verbatimStrings = @"@(""[^""]*"")+";
-
-							includedFile = Regex.Replace(includedFile,
-							blockComments + "|" + lineComments + "|" + strings + "|" + verbatimStrings,
-							me => {
-								if (me.Value.StartsWith("/*") || me.Value.StartsWith("//"))
-									return me.Value.StartsWith("//") ? Environment.NewLine : "";
-								// Keep the literal strings
-								return me.Value;
-							},
-							RegexOptions.Singleline);
-						}
 						if (ASMSX)
 							includedFile = includedFile.Replace ("@@", ".");						
 						
@@ -978,6 +1029,11 @@ namespace sass
 					/// Cesc
 					case "incbin":
 					{
+						if(Settings.Verbose == VerboseLevels.Diagnostic)
+						{
+							//Console.WriteLine("incbin paramenters {0} parameter {1}",parameters, parameter);
+							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
+						}
 						parameters = parameters.Where(w => w != "").ToArray(); 
 
 						string file ="";
@@ -1017,10 +1073,12 @@ namespace sass
 								}
 								amountSkip = (long)ExpressionEngine.Evaluate(skipValue, PC, RootLineNumber);
 								amountSize = (long)ExpressionEngine.Evaluate(sizeValue, PC, RootLineNumber);
+								// Console.WriteLine("skip {0} size {1}",skipValue, sizeValue);
+								// Console.WriteLine("skip {0} size {1}",amountSkip, amountSize);
 							}
 							if(file != "")
 							{
-								/// per fer tambe la cerca al directori especificat amb --include
+								/// Cesc per fer tambe la cerca al directori especificat amb --include
 								file = GetIncludeFile("<"+ file +">");
 
 								if (File.Exists(file))
@@ -1041,23 +1099,32 @@ namespace sass
 										fs.Read(fileBytes, 0, (int)amountSize);
 										fs.Close();
 
-										if (amountSkip == 0 && amountSize == fsLength) 
-											Console.WriteLine("Including binary file {0}",file);
-										else
-											Console.WriteLine("Including binary file {0} skipping {1} bytes, saving {2} bytes",
-												file, amountSkip,amountSize);
-
+										if(Settings.Verbose != VerboseLevels.Quiet)
+										{
+											if (amountSkip == 0 && amountSize == fsLength) 
+												Console.WriteLine("Including binary file {0}",file);
+											else
+												Console.WriteLine("Including binary file {0} skipping {1} bytes, saving {2} bytes",
+													file, amountSkip,amountSize);
+										}
+										if(Settings.Verbose == VerboseLevels.Diagnostic)
+											Console.WriteLine("Readed {0} bytes",fileBytes.Length);
+										
 										listing.Output = fileBytes; 
 										PC += (uint)fileBytes.Length;
 										return listing;
 									}catch(Exception ex)
-									{										
+									{
+										if(Settings.Verbose == VerboseLevels.Diagnostic)
+											Console.WriteLine("Error {0}", ex.Message);	
+										
 										/// TODO: cal un error adequat
 										listing.Error = AssemblyError.FileNotFound;
 										fs.Close();
 									}
 								}
 								else{
+									
 									Console.WriteLine("File {0} not found.",file);
 									listing.Error = AssemblyError.FileNotFound;
 								}
@@ -1090,17 +1157,28 @@ namespace sass
 
 					case "phase":
 					{
+						try{
 						phasePC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
+						}
+						catch(Exception)
+						{
+							if(Settings.Verbose != VerboseLevels.Quiet)
+								Console.WriteLine("PHASE solve error in expression: {0}.", parameter);
+						}
+
 						if (phasePC == 0)
 						{
-							Console.WriteLine("ignore PHASE {0} = {1} do in pass two.", parameter, phasePC);
+							if(Settings.Verbose != VerboseLevels.Quiet)
+								Console.WriteLine("ignore PHASE {0} = {1} will be done in pass two.", parameter, phasePC);
+							
 							listing.PostponeEvalulation = true;
 						}
 						else
 						{
 							dephasePC = PC;
 							PC = phasePC;
-							Console.WriteLine("PHASE 0x{0:X} (PC: 0x{1:X})", phasePC, dephasePC);
+							if(Settings.Verbose != VerboseLevels.Quiet)
+								Console.WriteLine("PHASE 0x{0:X} (PC: 0x{1:X})", phasePC, dephasePC);
 						}
 						return listing;
 					}
@@ -1114,11 +1192,18 @@ namespace sass
 								delta = PC - phasePC;
 							else
 								delta = PC - dephasePC;
+
+							if(Settings.Verbose != VerboseLevels.Quiet)
+								Console.WriteLine("DEPHASE 0x{0:X} delta: 0x{1:X} (PC: 0x{2:X})", PC, delta, dephasePC + delta);
 							
-							Console.WriteLine("DEPHASE 0x{0:X} delta: 0x{1:X} (PC: 0x{2:X})", PC, delta, dephasePC + delta);
 							PC = dephasePC + delta;
 							phasePC =0;
 							dephasePC =0;
+						}
+						else if (passTwo) 
+						{
+							if(Settings.Verbose != VerboseLevels.Quiet)
+								Console.WriteLine("Error .dephase: missing .phase");
 						}
 						else
 						{
@@ -1156,6 +1241,33 @@ namespace sass
 
 							listing.Output = new byte[amount];
 
+							/*
+							//byte[] block = new byte[blockSize]; 
+							//listing.Output = new byte[amount];
+							List<Listing> block = new List<sass.Listing>();
+							ulong listLength = 0;
+
+							int last = Output.Listing.Count-1;
+							while(listLength < blockSize)
+							{
+								listLength += Output.Listing[last].Instruction.Length;
+								Console.WriteLine("{0}",Output.Listing[last].Instruction.Length);
+								block.Add(Output.Listing[last]);
+								last--;
+							}
+
+							foreach(var item in block)
+							{
+							}
+
+							for(ulong i=0;i<repeatAmount;i++)
+							{
+								//listing.Output = listing.Output[PC-blockSize];
+								for(ulong j=0;j<blockSize;j++){
+									listing.Output[i*blockSize+j]= 0;
+								} 								
+							}
+							*/
 							PC += (uint)amount;
 							PCRepeat =0;
 							repeatAmount =0;
@@ -1190,6 +1302,11 @@ namespace sass
 							string label = parameters[0].ToLower();
 							if (moduleNamespace != "")
 								label = moduleNamespace +"."+label;
+
+							/*foreach (var item in parameters)
+								result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
+							listing.Output = result.ToArray();
+							return listing;*/
 
 
                             ExpressionEngine.Symbols.Add(label, new Symbol(
@@ -1503,7 +1620,8 @@ namespace sass
             }
 			// Cesc
 			catch(Exception ex) {
-				Console.WriteLine ("Warn: {0}", ex.Message);
+				if(Settings.Verbose != VerboseLevels.Quiet)
+					Console.WriteLine ("Cesc Exception: {0}", ex.Message);
 			}
             return null;
         }

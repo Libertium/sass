@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace sass
+namespace sasSX
 {
     public static class Extensions
     {
@@ -40,7 +40,7 @@ namespace sass
 			int commentPosition = value.IndexOf (';');
 			/// Cesc: el cas mes simple, no hi han comentaris
 			if (commentPosition == -1)
-				return value.Trim(); //.Substring (0, commentPosition - 1).Trim ();
+				return value; //.Trim(); //.Substring (0, commentPosition - 1).Trim ();
 			// else
 			//	Console.WriteLine (value);
 
@@ -61,7 +61,7 @@ namespace sass
                 if (value[i] == '\'' && !inString)
                     inChar = !inChar;
             }
-            return value.Trim();
+			return value; //.Trim();
         }
 
         public static int SafeIndexOf(this string value, char needle, int index)

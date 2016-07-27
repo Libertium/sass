@@ -8,26 +8,36 @@ using System.Diagnostics;
 using System.Threading;
 using System.Globalization;
 
-namespace sass
+namespace sasSX
 {
+	// 0/q[uiet], 1/m[inimal], 2/n[ormal], 3/d[etailed], and 4/diag[nostic].
+	public enum VerboseLevels
+	{
+		Quiet = 		0,
+		Minimal = 		1, 
+		Normal = 		2,  
+		Detailed = 		3,
+		Diagnostic = 	4,
+	}
+
     public class Program
     {
 		static bool asmsx = false;
-
+		//static VerboseLevels VerboseLevel = VerboseLevels.Quiet;
         public static Dictionary<string, InstructionSet> InstructionSets;
 
         public static int Main(string[] args)
         {
             InstructionSets = new Dictionary<string, InstructionSet>();
-			InstructionSets.Add("z80", LoadInternalSet("sass.Tables.z80.table"));
-            InstructionSets.Add("z80alt", LoadInternalSet("sass.Tables.z80alt.table"));
+			InstructionSets.Add("z80", LoadInternalSet("sasSX.Tables.z80.table"));
+            InstructionSets.Add("z80alt", LoadInternalSet("sasSX.Tables.z80alt.table"));
             string instructionSet = "z80"; // Default
             string inputFile = null, outputFile = null;
             var settings = new AssemblySettings();
             List<string> defines = new List<string>();
 
 			Console.WriteLine ("-------------------------------------------------------------------------------");
-			Console.WriteLine ("sassMSX v.0.1 WIP cross-assembler. KnightOS [2015], Libertium Games[2016/07/26]");
+			Console.WriteLine ("sasSX v.0.2 WIP MSX cross-assembler.KnightOS [2015],Libertium Games[2016/07/27]");
 			Console.WriteLine ("-------------------------------------------------------------------------------");
 			// Assembling labels, calls and jumps
 			// Output text file game.txt saved
@@ -58,7 +68,8 @@ namespace sass
                                 }
                                 catch
                                 {
-                                    Console.Error.WriteLine("The specified encoding was not recognized. Use sass --list-encodings to see available encodings.");
+								Console.Error.WriteLine(
+									"The specified encoding was not recognized. Use sasSX --list-encodings to see available encodings.");
                                     return 1;
                                 }
                                 break;
@@ -90,7 +101,7 @@ namespace sass
 						
                             case "-l":
                             case "--listing":
-								if( !args[i+1].StartsWith("-"))
+								if(i<=arg.Length && !args[i+1].StartsWith("-"))
                                 	settings.ListingOutput = args[++i];
 								else
 									Console.WriteLine("!!--listing whithout parameter !!");
@@ -115,14 +126,21 @@ namespace sass
                                 break;
                             case "-v":
                             case "--verbose":
-                                settings.Verbose = true;
-								Console.WriteLine("Verbose:");
+								settings.Verbose = VerboseLevels.Normal;
+								if( i+1 <args.Length && !args[i+1].StartsWith("-"))
+								{
+									int level =0;
+									Int32.TryParse(args[++i],out level);
+									settings.Verbose = (VerboseLevels)level;
+								}
+								//settings.Verbose = VerboseLevel;
+								Console.WriteLine("Verbose level: {0}", settings.Verbose );
                                 break;
                         }
                     }
                     catch (ArgumentOutOfRangeException)
                     {
-                        Console.Error.WriteLine("Error: Invalid usage. Use sass.exe --help for usage information.");
+						Console.Error.WriteLine("Error: Invalid usage. Use sasSX.exe --help for usage information.");
                         return 1;
                     }
                 }
@@ -134,7 +152,7 @@ namespace sass
                         outputFile = args[i];
                     else
                     {
-                        Console.Error.WriteLine("Error: Invalid usage. Use sass.exe --help for usage information.");
+						Console.Error.WriteLine("Error: Invalid usage. Use sasSX.exe --help for usage information.");
                         return 1;
                     }
                 }
@@ -142,8 +160,8 @@ namespace sass
 
             if (inputFile == null)
             {
-				Console.Error.WriteLine ("Syntax: sassMSX [file.asm]");
-                Console.Error.WriteLine("No input file specified. Use sass.exe --help for usage information.");
+				Console.Error.WriteLine ("Syntax: sasSX [file.asm]");
+				Console.Error.WriteLine("No input file specified. Use sasSX.exe --help for usage information.");
                 return 1;
             }
             if (outputFile == null)
@@ -164,7 +182,6 @@ namespace sass
                 selectedInstructionSet = InstructionSets[instructionSet];
 
             var assembler = new Assembler(selectedInstructionSet, settings);
-
 			assembler.ASMSX = asmsx;
 
             foreach (var define in defines)
@@ -184,25 +201,39 @@ namespace sass
 			AssemblyOutput output = null;
 
 			if (file != "") {
+				Console.WriteLine ("Assembling labels, calls and jumps");
+				VerboseLevels v = settings.Verbose;
 				watch.Start ();
 				output = assembler.Assemble (file, inputFile);
-			
-				settings.Verbose = settings.Verbose | assembler.EnableVerbose;
-
+				//watch.Stop ();
+				if (settings.Verbose != v) {
+					Console.WriteLine("Verbose level from .asm: {0}", settings.Verbose);
+				}
+					
 				var errors = from l in output.Listing
 						where l.Warning != AssemblyWarning.None || l.Error != AssemblyError.None
 					orderby l.RootLineNumber
 					select l;
-				if (!settings.Verbose) {
+
+				if (settings.Verbose == VerboseLevels.Quiet || 
+					settings.Verbose == VerboseLevels.Diagnostic)  //!settings.Verbose) 
+				{
 					foreach (var listing in errors) {
 						if (listing.Error != AssemblyError.None)
+							//Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Error: " + listing.Error +". Code: " + listing.Code);
 							Console.Error.WriteLine (listing.FileName + " " + listing.Error + " " + listing.LineNumber + " " + listing.Code);
+
+						// Cesc
+						if (settings.Verbose == VerboseLevels.Diagnostic && listing.Warning != AssemblyWarning.None)
+							Console.Error.WriteLine (listing.FileName + ":" + listing.LineNumber + " Warning: " + listing.Warning +". Code: " + listing.Code);
 					}
 				}
 
-				if (settings.Verbose || settings.ListingOutput != null) {
+				if (settings.ListingOutput != null || 
+					(settings.Verbose != VerboseLevels.Quiet && settings.Verbose != VerboseLevels.Diagnostic) ) 
+				{
 					var listing = GenerateListing (output);
-					if (settings.Verbose)
+					if (settings.Verbose != VerboseLevels.Quiet && settings.Verbose != VerboseLevels.Minimal)
 						Console.Write (listing);
 					if (settings.ListingOutput != null)
 					{
@@ -216,12 +247,16 @@ namespace sass
 				if (assembler.IsROM) {
 					
 					// Sizes: 16KB to 48KB in steps of 16KB
-					int pages = 2;	// TODO Default 32KB
-					int size = pages * 16 * 1024;	
+					int pages =8;	// TODO Default 32KB
+					int size = pages * 16 * 1024;	// Default 128KB
 					byte[] rom = setROMHeader (size, assembler.ROMStart);
 				
 					int srcAdress = 0;
 					foreach (Assembler.ORGItem item in assembler.ORGsList) {
+
+						if(settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine ("ORG: 0x{0:X}-0x{1:X} Subpage:{2}", item.ORGAdress, item.ORGLength, item.Subpage);	
+
 						uint orgIni;
 						if (srcAdress == 0)
 							orgIni = item.ORGAdress - 0x4000 + 16;
@@ -240,13 +275,19 @@ namespace sass
 				else if (assembler.IsMegaROM) 
 				{
 					// Sizes: 128KB to 512KB in steps of 8KB
-					int pages =0;	
+					int pages =0;	// Default 128KB
 
 					foreach (Assembler.ORGItem item in assembler.ORGsList) {
 						pages = (int)Math.Max (pages, item.Subpage);
 
+						if(settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine ("ORG: 0x{0:X}-0x{1:X} Subpage:{2}", item.ORGAdress, item.ORGLength, item.Subpage);
 					}
 					pages++;
+
+					if(settings.Verbose == VerboseLevels.Diagnostic)
+						Console.WriteLine ("Pages count:{0}", pages);
+
 					int size = pages * 8 * 1024;	
 					byte[] rom = setROMHeader (size, assembler.ROMStart);
 
@@ -255,6 +296,9 @@ namespace sass
 					uint SubpageORG =0;
 
 					foreach (Assembler.ORGItem item in assembler.ORGsList) {
+						if(settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine ("ORG: 0x{0:X}-0x{1:X} Subpage:{2}", item.ORGAdress, item.ORGLength, item.Subpage);	
+						
 						uint orgIni;
 						if (item.Subpage != subpage) {
 							subpage = item.Subpage;
@@ -270,6 +314,10 @@ namespace sass
 						else
 							orgIni = (item.ORGAdress - SubpageORG) + item.Subpage *0x2000;
 
+						if(settings.Verbose == VerboseLevels.Diagnostic)
+							Console.WriteLine ("Megarom ORG: 0x{0:X}-0x{1:X} Subpage:{2} (Current Subpage:{3} SubpageORG:{4:x})", 
+								orgIni, item.ORGLength - item.ORGAdress, item.Subpage, subpage, SubpageORG);	
+
 						if (item.ORGAdress < 0xc000) {
 							uint len = (item.ORGAdress - SubpageORG) + item.Subpage *0x2000 + (item.ORGLength - item.ORGAdress);
 							for (uint i = orgIni; i < len; i++) {
@@ -283,8 +331,10 @@ namespace sass
 						File.WriteAllBytes (outputFile.Replace (".bin", ".rom"), rom);
 						Console.WriteLine ("Binary file " + outputFile.Replace (".bin", ".rom") + " saved");
 
-						File.WriteAllBytes (outputFile, output.Data);
-						Console.WriteLine ("Binary file " + outputFile + " saved");
+						if (settings.Verbose == VerboseLevels.Diagnostic) {
+							File.WriteAllBytes (outputFile, output.Data);
+							Console.WriteLine ("Binary file " + outputFile + " saved");
+						}
 					} else {
 						Console.WriteLine ("Errors count:{0}",errors.Count(e => e.Error != AssemblyError.None));
 					}
@@ -339,7 +389,7 @@ namespace sass
         {
             using (var writer = new StreamWriter(path))
             {
-                writer.WriteLine("; This file was generated by sass");
+                writer.WriteLine("; This file was generated by sasSX");
                 foreach (var symbol in assembler.ExpressionEngine.Symbols)
                 {
                     if (symbol.Value.IsLabel && !symbol.Key.Contains("@")) // The latter removes globalized local labels
@@ -430,8 +480,8 @@ namespace sass
 			Console.WriteLine("--nest-macros: \t\t\tsettings.AllowNestedMacros = true;");
 			Console.WriteLine("--output: --output-file: \toutputFile = args[++i];");
 			Console.WriteLine("-s --symbols: \t\t\tsettings.SymbolOutput = args[++i];");
-			Console.WriteLine("-v --verbose: \t\t\tsettings.Verbose = true;");
-			Console.WriteLine("-as --asmsx: \t\tasMSX syntax");
+			Console.WriteLine("-v --verbose: level \t\t0/q[uiet], 1/m[inimal], 2/n[ormal], 3/d[etailed], 4/diag[nostic]");
+			Console.WriteLine("-as --asmsx: \t\t\tasMSX syntax");
         }    
 	}
 }

@@ -1,3 +1,4 @@
+;.verbose
 .org 0
     nop
     nop
