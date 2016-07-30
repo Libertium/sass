@@ -36,7 +36,7 @@ namespace sasSX
         private string CurrentLine { get; set; }
         private bool Listing { get; set; }
 
-		private string moduleNamespace = "";
+		private Stack<string> moduleNamespace;
 
 		/// <summary>
 		/// Cesc: Gets or sets a value indicating whether this <see cref="sass.Assembler"/> is ASMS.
@@ -84,6 +84,7 @@ namespace sasSX
             Listing = true;
 
 			ORGsList = new List<ORGItem> ();
+			moduleNamespace = new Stack<string>();
         }
 
         readonly string[] ifDirectives = new[] { "endif", "else", "elif", "elseif", "ifdef", "ifndef", "if" };
@@ -432,6 +433,11 @@ namespace sasSX
                     else
                     {
                         var result = HandleDirective(CurrentLine);
+						if (IsMegaROM && PC < 0xC000 && PC > currentSubpageORG + 0x2000) {
+							AddError(CodeType.Label, AssemblyError.MegaROMSubpageOverflow);
+							if(Settings.Verbose == VerboseLevels.Diagnostic)
+								Console.WriteLine ("{0} {1} Subpage overflow: PC {2:X} {3:X}", FileNames.Peek (), LineNumbers.Peek (), PC, currentSubpageORG);
+						}
                         if (result != null)
                             Output.Listing.Add(result);
                     }
@@ -441,9 +447,8 @@ namespace sasSX
                 {
 					if (string.IsNullOrEmpty (CurrentLine) || !Listing) {
 						continue;
-					} else {
-
-						/// Cesc verbose
+					} else 
+					{
 						if(Settings.Verbose == VerboseLevels.Diagnostic)
 							Console.WriteLine ("0x{0:X} {1:D6} {2}",PC, RootLineNumber, CurrentLine);
 
@@ -464,6 +469,14 @@ namespace sasSX
 								LineNumber = LineNumbers.Peek (),
 								RootLineNumber = RootLineNumber
 							});
+	
+							if (IsMegaROM && PC < 0xC000 && PC +match.Length > currentSubpageORG + 0x2000) {
+								if(Settings.Verbose == VerboseLevels.Diagnostic)
+									Console.WriteLine ("{0} {1} Error: Subpage overflow: PC {2:X} {3:X}", 
+										FileNames.Peek (), LineNumbers.Peek (), PC, currentSubpageORG);
+
+								AddError (CodeType.Instruction, AssemblyError.MegaROMSubpageOverflow); // megaROM subpage overflow
+							}
 							PC += match.Length;
 						}
 					}
@@ -535,7 +548,7 @@ namespace sasSX
 						// Console.WriteLine ("Pass Two: " + entry.Code);
 						output.Listing [i] = HandleDirective (entry.Code, true);
 					}
-
+						
                     if (output.Listing[i].Output != null)
                         finalBinary.AddRange(output.Listing[i].Output);
                     continue;
@@ -889,6 +902,9 @@ namespace sasSX
 						//Cesc
 						if(amount <= 0xffff)
 						{
+							/*if (IsMegaROM && PC < 0xC000 && PC +amount > currentSubpageORG + 0x2000) {
+								Console.WriteLine ("{0} {1} Subpage overflow: PC {2:X} {3:X}", FileNames.Peek (), LineNumbers.Peek (), PC, currentSubpageORG);
+							}*/
                             listing.Output = new byte[amount];
                             for (int i = 0; i < (int)amount; i++)
                                 listing.Output[i] = (byte)ExpressionEngine.Evaluate(parameters[1], PC++, RootLineNumber);
@@ -924,10 +940,10 @@ namespace sasSX
 								/// posterior creix fora d'aquesta tindrem un problema :p
 								uint currentPC = PC;
 								PC = (uint)ExpressionEngine.Evaluate(parameter, PC, RootLineNumber);
-								if(Settings.Verbose == VerboseLevels.Diagnostic)
+								if(Settings.Verbose == VerboseLevels.Diagnostic){
 									Console.WriteLine("<< Subpage Overflow, Current PC:{3:X}, new PC:{0:X}, parameter:{1}, RootLineNumber:{2}, now {3:X} >>", 
 									PC, parameter, RootLineNumber,currentPC, now);
-								
+								}
 								listing.Error = AssemblyError.MegaROMSubpageOverflow;  // megaROM subpage overflow
 							}
 						}
@@ -1079,11 +1095,12 @@ namespace sasSX
 							if(file != "")
 							{
 								/// Cesc per fer tambe la cerca al directori especificat amb --include
-								file = GetIncludeFile("<"+ file +">");
+								string inc_file = GetIncludeFile("<"+ file +">");
+								if(inc_file != null)
+									file = inc_file;
 
 								if (File.Exists(file))
 								{
-									
 									var fs = new FileStream(file, FileMode.Open);
 									try{
 										if (amountSkip + amountSize > fs.Length)
@@ -1125,7 +1142,7 @@ namespace sasSX
 								}
 								else{
 									
-									Console.WriteLine("File {0} not found.",file);
+									Console.WriteLine("{0} {1} File {2} not found.", RootLineNumber, CurrentLine, file);
 									listing.Error = AssemblyError.FileNotFound;
 								}
 							}
@@ -1141,13 +1158,13 @@ namespace sasSX
 					}
 					case "module":
 					{
-						moduleNamespace = parameter;
+						moduleNamespace.Push(parameter);
 						break;
 					}
 					case "endmodule":
 					{
-						if (moduleNamespace != ""){
-							moduleNamespace = "";
+						if (moduleNamespace.Count >0){
+							moduleNamespace.Pop();
 						}
 						else{
 							Console.WriteLine("Error .endmodule: missing .module");
@@ -1300,8 +1317,8 @@ namespace sasSX
 
 							/// Cesc: append module name
 							string label = parameters[0].ToLower();
-							if (moduleNamespace != "")
-								label = moduleNamespace +"."+label;
+							if (moduleNamespace.Count >0 )
+								label = moduleNamespace.First() +"."+label;
 
 							/*foreach (var item in parameters)
 								result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));

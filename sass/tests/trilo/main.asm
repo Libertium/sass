@@ -175,7 +175,7 @@ isr:
 	.org 0x6000
 	.subpage 1 at $6000	
 demo_song:
-	.INCLUDE	".\tests\trilo\neme2int.asm"
+	.INCLUDE	".\tests\trilo\andorogy.asm"
 
 	.subpage 15 at $8000	
 
