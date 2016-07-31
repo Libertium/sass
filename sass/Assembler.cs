@@ -83,7 +83,7 @@ namespace sasSX
             WorkingIfStack = new Stack<bool>();
             Listing = true;
 
-			ORGsList = new List<ORGItem> ();
+			ORGsList = new List<ORGItem> (new ORGItem[1]);
 			moduleNamespace = new Stack<string>();
         }
 
@@ -296,7 +296,7 @@ namespace sasSX
                             else
                             {
                                 AddOutput(CodeType.Label);
-                                ExpressionEngine.Symbols.Add(label.ToLower(), new Symbol(PC, true));
+								ExpressionEngine.Symbols.Add(label.ToLower(), new Symbol(PC, true, ORGsList.Last().Subpage));
                                 if (!local)
                                     ExpressionEngine.LastGlobalLabel = label.ToLower();
                             }
@@ -347,7 +347,7 @@ namespace sasSX
                         else
                         {
                             AddOutput(CodeType.Label);
-                            ExpressionEngine.Symbols.Add(label.ToLower(), new Symbol(PC, true));
+							ExpressionEngine.Symbols.Add(label.ToLower(), new Symbol(PC, true, ORGsList.Last().Subpage));
                             if (!local)
                                 ExpressionEngine.LastGlobalLabel = label.ToLower();
                         }
@@ -1324,14 +1324,10 @@ namespace sasSX
 								result.AddRange(TruncateWord(ExpressionEngine.Evaluate(item, PC++, RootLineNumber)));
 							listing.Output = result.ToArray();
 							return listing;*/
-
-
+			
                             ExpressionEngine.Symbols.Add(label, new Symbol(
-								(uint) ExpressionEngine.Evaluate(
-                                  parameter.Substring(
-                                      parameter.IndexOf(' ') + 1)
-                                           .Trim(), PC,
-									RootLineNumber)));
+								(uint) ExpressionEngine.Evaluate(parameter.Substring(parameter.IndexOf(' ') + 1).Trim(), PC,RootLineNumber),
+								ORGsList.Last().Subpage));
                         }
                         return listing;
 					}
