@@ -574,6 +574,7 @@ namespace sasSX
 							bool truncated;
                             if (value.Value.RelativeToPC)
 							{
+								truncated = false;
 								var exp = ExpressionEngine.Evaluate(value.Value.Value, entry.Address, entry.RootLineNumber);
                                 instruction = instruction.Replace("^" + value.Key, ConvertToBinary(
 									(exp - entry.Instruction.Length) - entry.Address,
@@ -592,14 +593,21 @@ namespace sasSX
                                 }
                             }
                             else
+							{
+								truncated = false;
                                 instruction = instruction.Replace("%" + value.Key, ConvertToBinary(
                                     ExpressionEngine.Evaluate(value.Value.Value, entry.Address, entry.RootLineNumber),
 									value.Value.Bits, false, out truncated));
-							
+							}
 							if (truncated){
-								/// Cesc
-                               // entry.Error = AssemblyError.ValueTruncated;
-								entry.Warning = AssemblyWarning.ValueTruncated;
+								/// Cesc: 25-8-2016
+								/// Cal identificar on l'adreça exedeix 127 per els salts relatius com JR o DJNZ
+								/// El problema es que aixo no contempla salts negatius de -1 a -127 (128 a 255)
+								/// El segon problema es que avalua de forma diferent ld a,-8 i ld a,VALNEGATIU definit com a VALNEGATIU .equ -8
+								/// Tot plegat a causa del metode ConvertToBinary(...) que no te una implementacio gaire bona. 
+                                //entry.Error = AssemblyError.ValueTruncated;
+								entry.Error = AssemblyError.RelativeAddressTooLong;
+								//entry.Warning = AssemblyWarning.ValueTruncated;
 							}
                         }
                         catch (KeyNotFoundException)
@@ -626,9 +634,9 @@ namespace sasSX
 
 		public static string ConvertToBinary(ulong value, int bits, bool signed, out bool truncated) // Little endian octets
         {
-            ulong mask = 1;
+            uint mask = 1;
             string result = "";
-            ulong truncationMask = 1;
+            uint truncationMask = 1;
             for (int i = 0; i < bits; i++)
             {
                 truncationMask <<= 1;
@@ -642,14 +650,15 @@ namespace sasSX
 			truncationMask >>= 1;
 			if (signed)
 			{
-				long _value = (long)value;
+				int _value = (int)value;
 				truncated = 1 << (bits - 1) < Math.Abs (_value);
 			}
 			else
 			{
-				long _value = (long)value;
+				int _value = (int)value;
 				truncated = 1 << bits < (Math.Abs(_value) + 1);
 			}
+	
             // Convert to little endian
             if (result.Length % 8 != 0)
                 return result;

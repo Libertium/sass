@@ -17,6 +17,7 @@ namespace sasSX
         UnknownSymbol = 7,
         UncoupledStatement = 8,
         ValueTruncated = 9,
-		MegaROMSubpageOverflow =10
+		RelativeAddressTooLong = 10,
+		MegaROMSubpageOverflow =11,
     }
 }
