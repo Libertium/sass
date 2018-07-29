@@ -25,7 +25,7 @@ namespace sasSX
 		static bool asmsx = false;
 		static AssemblySettings settings;
         public static Dictionary<string, InstructionSet> InstructionSets;
-		static string version =".0.4";
+		static string version =".0.5";
 
         public static int Main(string[] args)
         {
@@ -254,6 +254,8 @@ namespace sasSX
 					{						
 						symbolWriter .WriteLine ("; This symbol table file was generated from {0}", inputFile);
 						symbolWriter .WriteLine ("; sasSX Version " + version);
+						symbolWriter.WriteLine ();
+						symbolWriter .WriteLine ("; global and local labels");
 						WriteSymbols (assembler, symbolWriter );
 						Console.WriteLine ("Symbols file " + settings.SymbolOutput + " saved");
 					}
@@ -418,8 +420,8 @@ namespace sasSX
 				}
 			} else {
 				foreach (var symbol in assembler.ExpressionEngine.Symbols) {
-					if (symbol.Value.IsLabel && !symbol.Key.Contains ("@")) // The latter removes globalized local labels
-						writer.WriteLine ("{0:X2}h:{1:X4}h {2}", symbol.Value.Subpage, symbol.Value.Value, symbol.Key);
+					if (symbol.Value.IsLabel) // && !symbol.Key.Contains ("@")) // The latter removes globalized local labels
+						writer.WriteLine ("{0:X2}h:{1:X4}h {2}", symbol.Value.Subpage, symbol.Value.Value, symbol.Key.ToUpper());
 						if (settings.Verbose == VerboseLevels.Diagnostic)
 							Console.WriteLine ("{0:X2}h:{1:X4}h {2}", symbol.Value.Subpage, symbol.Value.Value, symbol.Key);
 				}
