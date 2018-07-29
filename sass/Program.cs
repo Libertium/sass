@@ -261,9 +261,9 @@ namespace sasSX
 
 				// Cesc: todo pendent de validar amb casos de prova i en especial les ROM de 48KB
 				if (assembler.IsROM) {
-					
-					// Sizes: 16KB to 48KB in steps of 16KB
-					int pages =8;	// TODO Default 32KB
+
+                    // Sizes: 16KB to 48KB in steps of 16KB
+                    int pages = 2;	// TODO Default 32KB
 					int size = pages * 16 * 1024;	// Default 128KB
 					byte[] rom = setROMHeader (size, assembler.ROMStart);
 				
